@@ -99,22 +99,23 @@
     assertEq(p.progress['the-core'].stars, 3);
   });
 
-  test('biasBreakerQuestions has exactly 8 well-formed entries', function() {
-    assertEq(GG.biasBreakerQuestions.length, 8);
-    GG.biasBreakerQuestions.forEach(function(q, i) {
-      assertTrue(!!q.id,        'q[' + i + '] missing id');
-      assertTrue(!!q.question,  'q[' + i + '] missing question');
+  test('biasBreakerQuestions.pickN(5) returns 5 well-formed questions', function() {
+    var qs = GG.biasBreakerQuestions.pickN(5);
+    assertEq(qs.length, 5);
+    qs.forEach(function(q, i) {
+      assertTrue(!!q.question, 'q[' + i + '] missing question');
       assertEq(q.options.length, 4, 'q[' + i + '] should have 4 options');
-      var correctCount = q.options.filter(function(o) { return o.correct; }).length;
-      assertEq(correctCount, 1, 'q[' + i + '] should have exactly 1 correct option');
+      assertTrue(typeof q.correct === 'number' && q.correct >= 0 && q.correct < 4,
+                 'q[' + i + '].correct should be a 0-3 index');
       q.options.forEach(function(opt, j) {
-        if (opt.correct) {
-          assertTrue(!!opt.motivation, 'q[' + i + '].option[' + j + '] correct=true missing motivation');
-        } else {
-          assertTrue(!!opt.explanation, 'q[' + i + '].option[' + j + '] correct=false missing explanation');
-        }
+        assertTrue(typeof opt === 'string' && opt.length > 0,
+                   'q[' + i + '].option[' + j + '] should be a non-empty string');
       });
     });
+  });
+
+  test('biasBreakerQuestions.size() returns positive count', function() {
+    assertTrue(GG.biasBreakerQuestions.size() > 0, 'pool should not be empty');
   });
 
   function render() {
