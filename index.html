@@ -584,6 +584,7 @@
                     100% { background-position: 0% 50%; }
                 }
             </style>
+            <button id="gg-launch-button" class="gg-launch" type="button">🎮 Play Glitch Guardians</button>
         </div>
 
         <!-- Home Screen -->
@@ -3518,5 +3519,14 @@
             setTimeout(initYTPlayers, 500);
         };
     </script>
+
+    <!-- Glitch Guardians game module -->
+    <link rel="stylesheet" href="GAME/glitch-guardians.css">
+    <div id="gg-root" hidden></div>
+    <script src="GAME/state.js"></script>
+    <script src="GAME/screens/onboarding.js"></script>
+    <script src="GAME/screens/map.js"></script>
+    <script src="GAME/screens/island-intro.js"></script>
+    <script src="GAME/glitch-guardians.js"></script>
 </body>
 </html>
