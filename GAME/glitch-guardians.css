@@ -432,8 +432,8 @@
 .gg-bb-stage {
   position: relative;
   width: 100%;
-  max-width: 900px;
-  margin: 80px auto 20px auto;
+  max-width: 1300px;
+  margin: 70px auto 20px auto;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(120, 60, 200, 0.2);
@@ -474,31 +474,67 @@
 .gg-bb-banner-correct  { background: #d4f8d4; color: #1c5b27; }
 .gg-bb-banner-wrong    { background: #fde2e0; color: #6e1b22; }
 
-/* Answer label sits in canvas coordinates (positioned per-frame by JS).
-   Pointer-events: none so it never blocks clicks (we don't use clicks). */
+/* Answer label sits ON its cloud (positioned per-frame by JS in canvas coords). */
 .gg-bb-answer-label {
   position: absolute;
   pointer-events: none;
-  padding: 5px 10px;
-  font-size: 0.78em;
+  padding: 8px 14px;
+  font-size: 0.95em;
   font-weight: bold;
-  line-height: 1.15;
+  line-height: 1.2;
   text-align: center;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.97);
   color: #1a1247;
-  border-radius: 10px;
-  border: 2px solid currentColor;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  border-radius: 14px;
+  border: 3px solid currentColor;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   z-index: 5;
-  /* Multi-line wrap so the entire option text is readable */
   white-space: normal;
   word-wrap: break-word;
-  min-width: 160px;
-  transition: opacity 0.3s;
+  min-width: 180px;
+  max-width: 240px;
+  transform: translateX(-50%);  /* center horizontally on its anchor point */
+  transition: opacity 0.3s, transform 0.3s;
 }
-.gg-bb-label-dim       { opacity: 0.25; filter: grayscale(0.6); }
-.gg-bb-label-crumbling { opacity: 0.4; transform: rotate(-3deg); }
-.gg-bb-label-locked    { background: #ffd700; color: #1a1247; }
+.gg-bb-label-dim       { opacity: 0.22; filter: grayscale(0.6); }
+.gg-bb-label-crumbling { opacity: 0.4; transform: translateX(-50%) rotate(-3deg); }
+.gg-bb-label-locked    { background: #ffd700; color: #1a1247; transform: translateX(-50%) scale(1.08); }
+
+/* Door at the end of the level — glowing arch */
+.gg-bb-door-prompt {
+  position: absolute;
+  pointer-events: none;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #ffd700, #ff9500);
+  color: #1a1247;
+  font-weight: bold;
+  border-radius: 18px;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  z-index: 6;
+  font-size: 0.95em;
+  transform: translateX(-50%);
+}
+.gg-bb-door-prompt[hidden] { display: none; }
+
+/* Combo streak indicator */
+.gg-bb-streak {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffd700;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 12px;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+  pointer-events: none;
+  z-index: 6;
+  transition: transform 0.2s;
+}
+.gg-bb-streak[hidden] { display: none; }
+.gg-bb-streak-flash { transform: scale(1.3); }
 
 .gg-bb-avatar {
   position: absolute;
