@@ -21,28 +21,31 @@ GG.screens = GG.screens || {};
 
 GG.screens.biasBreaker = (function() {
   // ---- World constants ----
-  var CANVAS_W = 1600;
-  var CANVAS_H = 720;
+  var CANVAS_W = 1800;
+  var CANVAS_H = 780;
   var GRAVITY    = 0.65;
   var JUMP_SPEED = -13;
-  var WALK_SPEED = 3.5;          // slower per user request
+  var WALK_SPEED = 3.5;
   var FRICTION   = 0.82;
   var PLAYER_W   = 50;
   var PLAYER_H   = 100;
 
-  var SOLID_Y = 580;
-  var SOLID_W = 220;
-  var SECTION_SPACING = 560;     // wider gaps now that flyers vary in size
+  var SOLID_Y = 620;
+  var SOLID_W = 240;
+  // SECTION_SPACING is the x-distance between two consecutive solid platforms.
+  // We render only currentSection + nextSection — so this spacing dictates how
+  // far apart the 2 visible platforms sit on screen.
+  var SECTION_SPACING = 1100;
 
-  var FLYER_DRIFT_RANGE = 80;
+  var FLYER_DRIFT_RANGE = 95;
   var FLYER_DRIFT_SPEED = 0.011;
-  var FLYER_Y_TOP  = 220;
-  var FLYER_Y_STEP = 80;
+  var FLYER_Y_TOP  = 240;
+  var FLYER_Y_STEP = 90;
 
   var COMMIT_FRAMES   = 90;   // 1.5s @ 60fps to commit
   var CRASH_FRAMES    = 120;  // 2s @ 60fps anti-camp crash
 
-  var LAVA_Y       = CANVAS_H - 60;  // lava surface
+  var LAVA_Y       = CANVAS_H - 70;  // lava surface
   var FLYER_TYPES = ['cloud', 'bird', 'kite', 'helicopter', 'quadcopter'];
   var ANSWER_COLORS = ['#43e97b', '#f5576c', '#ffd166', '#8b5cf6'];
 
@@ -408,11 +411,17 @@ GG.screens.biasBreaker = (function() {
       state.onFlyer = null;
 
       var pads = [];
-      // Solids: current section's and one before (so retreating works)
+      // Only the CURRENT and NEXT section's solids are collidable —
+      // matches what's visually rendered, so the player can't accidentally
+      // land on an invisible older platform.
       level.sections.forEach(function(s, i) {
-        if (i <= state.currentSection) pads.push(s.solid);
+        if (i === state.currentSection || i === state.currentSection + 1) {
+          pads.push(s.solid);
+        }
       });
-      pads.push(level.finalSolid);
+      if (state.currentSection >= level.sections.length - 1) {
+        pads.push(level.finalSolid);
+      }
       // Active section's live flyers
       var sec = level.sections[state.currentSection];
       if (sec && !sec.answered) {
@@ -1020,12 +1029,20 @@ GG.screens.biasBreaker = (function() {
       ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
       drawBackground();
       drawLava();
-      level.sections.forEach(function(s) { drawSolid(s.solid); });
-      drawSolid(level.finalSolid);
+      // Only the CURRENT section's solid and the NEXT solid are visible.
+      // This keeps exactly 2 platforms on screen: the one the player is on,
+      // and the one they're trying to reach.
       level.sections.forEach(function(s, i) {
-        // Only draw current section's flyers (other sections' flyers are invisible)
+        if (i === state.currentSection || i === state.currentSection + 1) {
+          drawSolid(s.solid);
+        }
+      });
+      // Final solid only appears once the player is in the last section
+      if (state.currentSection >= level.sections.length - 1) {
+        drawSolid(level.finalSolid);
+      }
+      level.sections.forEach(function(s, i) {
         if (i === state.currentSection) s.flyers.forEach(drawFlyer);
-        // Carrying flyer still drawn during transition
         else s.flyers.forEach(function(f) { if (f.carrying) drawFlyer(f); });
       });
       drawDoor();

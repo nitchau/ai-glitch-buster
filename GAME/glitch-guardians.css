@@ -431,13 +431,13 @@
 
 .gg-bb-stage {
   position: relative;
-  /* Use ~95% of viewport width (capped at 1600px) so the play area feels big */
-  width: 95vw;
-  max-width: 1600px;
-  margin: 60px auto 20px auto;
-  border-radius: 24px;
+  /* Fill the monitor: 98% of viewport width, no hard cap so big screens get big stage */
+  width: 98vw;
+  max-width: 1900px;
+  margin: 48px auto 20px auto;
+  border-radius: 22px;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(120, 60, 200, 0.2);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(120, 60, 200, 0.2);
   border: 1px solid rgba(67, 233, 123, 0.4);
   background: #0a0820;
 }
@@ -453,22 +453,24 @@
   overflow: hidden;
 }
 
-/* The question banner floats near the top of the stage */
+/* The question banner floats near the top of the stage — generously sized */
 .gg-bb-banner {
   position: absolute;
-  top: 14px;
+  top: 22px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 78%;
-  padding: 12px 22px;
-  font-size: 1.05em;
+  max-width: 86%;
+  padding: 22px 38px;
+  font-size: 1.35em;
   font-weight: bold;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.94);
+  line-height: 1.4;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.97);
   color: #1a1247;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.4);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45);
   text-align: center;
   z-index: 6;
+  letter-spacing: 0.2px;
 }
 .gg-bb-banner[hidden] { display: none; }
 .gg-bb-banner-question { background: rgba(255, 255, 255, 0.96); }
