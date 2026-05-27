@@ -189,6 +189,78 @@
   z-index: 1;
 }
 
+/* ---------- Background scene (confused kids + floating particles) ---------- */
+
+.gg-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;          /* sits BEHIND .gg-screen (z-index: 1) */
+  pointer-events: none; /* never blocks island clicks */
+  overflow: hidden;
+}
+
+/* Confused-kid silhouettes — one per screen corner */
+.gg-citizen {
+  position: absolute;
+  width: 110px;
+  opacity: 0.42;
+  animation: gg-citizen-bob 5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+}
+.gg-citizen-tl { top: 14%;    left: 3%;  animation-delay: 0s;    }
+.gg-citizen-tr { top: 14%;    right: 3%; animation-delay: 1.25s; }
+.gg-citizen-bl { bottom: 18%; left: 3%;  animation-delay: 2.50s; }
+.gg-citizen-br { bottom: 18%; right: 3%; animation-delay: 3.75s; }
+
+@keyframes gg-citizen-bob {
+  0%, 100% { transform: translateY(0)    rotate(0deg);  }
+  50%      { transform: translateY(-8px) rotate(1.5deg); }
+}
+
+.gg-kid-svg { width: 100%; height: auto; overflow: visible; }
+
+/* Thought bubbles gently pulse so they look "active" */
+.gg-thought {
+  transform-origin: 78px 22px;
+  animation: gg-thought-pulse 2.4s ease-in-out infinite;
+}
+@keyframes gg-thought-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%      { transform: scale(1.18); opacity: 0.85; }
+}
+
+/* Floating data particles — rise from bottom to top with slight drift */
+.gg-particle {
+  position: absolute;
+  bottom: -16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 215, 100, 0.6);
+  box-shadow: 0 0 12px rgba(255, 215, 100, 0.55);
+  animation: gg-particle-rise 14s linear infinite;
+}
+.gg-particle-0 { background: rgba(120, 230, 255, 0.6); box-shadow: 0 0 12px rgba(120,230,255,0.55); }
+.gg-particle-1 { background: rgba(255, 200, 120, 0.6); box-shadow: 0 0 12px rgba(255,200,120,0.55); }
+.gg-particle-2 { background: rgba(200, 150, 255, 0.6); box-shadow: 0 0 12px rgba(200,150,255,0.55); }
+.gg-particle-3 { background: rgba(120, 240, 200, 0.6); box-shadow: 0 0 12px rgba(120,240,200,0.55); }
+
+@keyframes gg-particle-rise {
+  0%   { transform: translateY(0)      translateX(0);    opacity: 0; }
+  10%  {                                                 opacity: 1; }
+  90%  {                                                 opacity: 1; }
+  100% { transform: translateY(-110vh) translateX(40px); opacity: 0; }
+}
+
+/* Responsive: shrink the kids on tablet, hide on phone (no point cluttering) */
+@media (max-width: 700px) {
+  .gg-citizen { width: 78px; opacity: 0.32; }
+}
+@media (max-width: 480px) {
+  .gg-citizen { display: none; }
+  .gg-particle { animation-duration: 18s; }
+}
+
 /* ---------- Map ---------- */
 
 .gg-map-header {
@@ -196,8 +268,15 @@
   color: white;
   text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
   margin-bottom: 20px;
+  animation: gg-fade-in-up 0.6s ease-out both;
 }
 .gg-map-header h2 { font-size: 2em; }
+
+/* Staggered entrance for the header → islands sequence */
+@keyframes gg-fade-in-up {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
 
 .gg-map-svg {
   width: 100%;
@@ -234,6 +313,19 @@
   cursor: pointer;
   transform-origin: center;
   transform-box: fill-box;
+  animation: gg-pop-in 0.5s ease-out backwards;
+}
+/* Stagger each island's entrance — first island starts shortly after the header */
+.gg-island-0 { animation-delay: 0.25s; }
+.gg-island-1 { animation-delay: 0.40s; }
+.gg-island-2 { animation-delay: 0.55s; }
+.gg-island-3 { animation-delay: 0.70s; }
+.gg-island-4 { animation-delay: 0.85s; }
+
+@keyframes gg-pop-in {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { transform: scale(1.15);            }
+  100% { transform: scale(1);   opacity: 1; }
 }
 .gg-island-circle {
   fill: white;
