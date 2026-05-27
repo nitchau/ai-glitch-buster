@@ -397,24 +397,45 @@ GG.screens.biasBreaker = (function() {
             return;
           }
           if (f.carrying) {
-            // Flyer descending while carrying player
+            // Flyer descending while carrying player TOWARD next solid platform
             var nextSolid = level.sections[state.currentSection + 1] ?
               level.sections[state.currentSection + 1].solid : level.finalSolid;
             var targetX = nextSolid.x + 30;
-            var targetY = nextSolid.y - f.h;
+            // Target so the flyer's TOP is just above the platform surface; the
+            // player's bottom (= f.y) then sits right at the platform's top.
+            var targetY = nextSolid.y - 0;
             var dx = (targetX - f.x) * 0.06;
             var dy = (targetY - f.y) * 0.06;
             f.vx = dx;
             f.x += dx;
             f.y += dy;
-            // Check arrival
+
+            // LOCK player to the flyer during transit — overrides gravity so
+            // the player doesn't fall through into the lava
+            if (state.carryingFlyer === f) {
+              state.x = f.x + (f.w / 2) - (PLAYER_W / 2);
+              state.y = f.y - PLAYER_H;
+              state.vx = 0;
+              state.vy = 0;
+              state.onGround = true;
+            }
+
+            // Arrival check
             if (Math.abs(f.x - targetX) < 4 && Math.abs(f.y - targetY) < 4) {
-              // Drop the player onto the solid
+              // Drop the player onto the solid platform — snap exactly
               state.onFlyer = null;
               f.carrying = false;
               f.state = 'gone';
               if (f.labelEl && f.labelEl.parentNode) f.labelEl.parentNode.removeChild(f.labelEl);
               state.carryingFlyer = null;
+
+              // Snap player to the next platform's surface (not relying on gravity)
+              state.x = nextSolid.x + 40;
+              state.y = nextSolid.y - PLAYER_H;
+              state.vx = 0;
+              state.vy = 0;
+              state.onGround = true;
+
               state.currentSection = idx + 1;
               hud.setPlatforms(state.currentSection, level.sections.length);
               if (state.currentSection >= level.sections.length) {
@@ -1128,7 +1149,12 @@ GG.screens.biasBreaker = (function() {
       if (state.isPaused) return;
       state.animTime++;
 
-      if (!state.doorEntered) {
+      // SKIP normal input/physics while the carrier flyer is delivering the
+      // player to the next platform — player position is locked to the flyer
+      // inside updateFlyers().
+      var carrying = !!state.carryingFlyer;
+
+      if (!state.doorEntered && !carrying) {
         var goLeft  = keys.KeyA || keys.ArrowLeft;
         var goRight = keys.KeyD || keys.ArrowRight;
         var jump    = keys.Space || keys.KeyW || keys.ArrowUp;
@@ -1147,8 +1173,6 @@ GG.screens.biasBreaker = (function() {
         state.vy += GRAVITY;
         state.x  += state.vx;
         state.y  += state.vy;
-        // LEFT WALL — cannot go left of the first platform's left edge
-        // (story: that's where the player entered from a door, no going back)
         if (state.x < level.firstSolidX) {
           state.x = level.firstSolidX;
           if (state.vx < 0) state.vx = 0;
@@ -1156,11 +1180,14 @@ GG.screens.biasBreaker = (function() {
       }
 
       updateFlyers();
-      checkCollisions();
-      checkLava();
-      updateDwell();
-      checkDoor();
-      checkEntryDoor();
+
+      if (!carrying) {
+        checkCollisions();
+        checkLava();
+        updateDwell();
+        checkDoor();
+        checkEntryDoor();
+      }
       updateCamera();
 
       // ---- Render ----
