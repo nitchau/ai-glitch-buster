@@ -424,3 +424,184 @@
   margin-bottom: 24px;
 }
 .gg-coming-soon p { margin: 4px 0; }
+
+/* ============================================================
+ *  Bias Breaker (Phase 2) — neon-cyber level + modal + celebration
+ * ============================================================ */
+
+.gg-bb-stage {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 80px auto 20px auto;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(120, 60, 200, 0.2);
+  border: 1px solid rgba(67, 233, 123, 0.4);
+  background: #0a0820;
+}
+
+.gg-bb-canvas { display: block; width: 100%; height: auto; }
+
+.gg-bb-avatar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50px;
+  height: 100px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+  transition: none;
+  transform-origin: top left;
+}
+
+.gg-bb-hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: #43e97b;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  text-shadow: 0 0 8px rgba(67, 233, 123, 0.8);
+  pointer-events: none;
+  z-index: 5;
+}
+.gg-bb-hud-platforms { display: block; }
+.gg-bb-hud-boss { display: block; margin-top: 6px; color: #f5576c; text-shadow: 0 0 8px rgba(245, 87, 108, 0.8); }
+
+/* Modal — slides up from bottom */
+.gg-bb-modal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: white;
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  padding: 24px 24px 28px 24px;
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.5);
+  animation: gg-bb-modal-slide 0.3s ease-out both;
+  z-index: 10;
+}
+@keyframes gg-bb-modal-slide {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.gg-bb-modal-question {
+  font-size: 1.2em;
+  margin-bottom: 16px;
+  color: #1a1247;
+  font-weight: bold;
+  text-align: center;
+}
+
+.gg-bb-modal-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gg-bb-modal-option {
+  font-family: inherit;
+  font-size: 1em;
+  padding: 14px 18px;
+  border: 2px solid #ddd;
+  border-radius: 14px;
+  cursor: pointer;
+  background: #fafafa;
+  min-height: 44px;
+  color: #1a1247;
+  font-weight: bold;
+  transition: background 0.15s, transform 0.15s;
+  text-align: left;
+}
+.gg-bb-modal-option:hover:not(:disabled) { background: #f0f0f0; transform: translateY(-1px); }
+.gg-bb-modal-option:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.gg-bb-modal-feedback {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.98em;
+}
+.gg-bb-modal-feedback.gg-bb-correct {
+  background: #d4f8d4;
+  border: 1px solid #43e97b;
+  color: #1c5b27;
+}
+.gg-bb-modal-feedback.gg-bb-wrong {
+  background: #fde2e0;
+  border: 1px solid #f5576c;
+  color: #6e1b22;
+}
+
+/* Pause overlay */
+.gg-bb-pause {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 10, 60, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 15;
+  color: white;
+}
+.gg-bb-pause h2 { color: #43e97b; font-size: 2em; text-shadow: 0 0 12px rgba(67, 233, 123, 0.6); }
+
+/* Celebration overlay */
+.gg-bb-celebration {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 10, 60, 0.92);
+  color: white;
+  text-align: center;
+  padding: 30px;
+  z-index: 20;
+  animation: gg-fade-in-up 0.5s ease-out both;
+}
+.gg-bb-celebration h1 {
+  font-size: 2.4em;
+  color: #43e97b;
+  text-shadow: 0 0 20px rgba(67, 233, 123, 0.6);
+  margin-bottom: 12px;
+}
+.gg-bb-celebration p { font-size: 1.1em; margin-bottom: 18px; max-width: 500px; }
+.gg-bb-celebration-stars { font-size: 3em; letter-spacing: 12px; margin: 14px 0; }
+.gg-bb-celebration-unlocked {
+  background: #ffd700;
+  color: #1a1247;
+  padding: 10px 18px;
+  border-radius: 14px;
+  font-weight: bold;
+  margin: 18px 0;
+}
+
+.gg-bb-confetti-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 19;
+}
+
+/* Fall fade */
+.gg-bb-fall-overlay {
+  position: absolute;
+  inset: 0;
+  background: black;
+  z-index: 18;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.gg-bb-fall-overlay.gg-bb-fading { opacity: 1; }
+
+@media (max-width: 600px) {
+  .gg-bb-modal-options { grid-template-columns: 1fr; }
+}
