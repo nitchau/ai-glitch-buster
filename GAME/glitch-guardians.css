@@ -600,6 +600,8 @@
 }
 .gg-bb-hud-platforms { display: block; }
 .gg-bb-hud-boss { display: block; margin-top: 6px; color: #f5576c; text-shadow: 0 0 8px rgba(245, 87, 108, 0.8); }
+.gg-bb-hud-timer { display: block; margin-top: 6px; color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.8); }
+.gg-bb-hud-score { display: block; margin-top: 6px; color: #38f9d7; text-shadow: 0 0 8px rgba(56, 249, 215, 0.8); }
 
 /* Modal — slides up from bottom */
 .gg-bb-modal {
@@ -706,6 +708,22 @@
 }
 .gg-bb-celebration p { font-size: 1.1em; margin-bottom: 18px; max-width: 500px; }
 .gg-bb-celebration-stars { font-size: 3em; letter-spacing: 12px; margin: 14px 0; }
+.gg-bb-celebration-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 10px 0 6px 0;
+  font-size: 1.1em;
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.5);
+}
+.gg-bb-celebration-stats span {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
 .gg-bb-celebration-unlocked {
   background: #ffd700;
   color: #1a1247;

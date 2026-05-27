@@ -29,6 +29,26 @@ GG.biasBreakerCelebration = (function() {
     starsEl.textContent = s;
     overlay.appendChild(starsEl);
 
+    // Time + bonus score (Phase 2 v13)
+    if (typeof opts.time === 'number' || typeof opts.score === 'number') {
+      var statsEl = document.createElement('div');
+      statsEl.className = 'gg-bb-celebration-stats';
+      if (typeof opts.time === 'number') {
+        var tier = opts.time <= 30 ? ' ⚡ Lightning!'
+                 : opts.time <= 40 ? ' Quick!'
+                 :                   '';
+        var ts = document.createElement('span');
+        ts.textContent = '⏱ ' + opts.time + 's' + tier;
+        statsEl.appendChild(ts);
+      }
+      if (typeof opts.score === 'number' && opts.score > 0) {
+        var ss = document.createElement('span');
+        ss.textContent = '🐢 +' + opts.score + ' bonus pts';
+        statsEl.appendChild(ss);
+      }
+      overlay.appendChild(statsEl);
+    }
+
     var unlocked = document.createElement('div');
     unlocked.className = 'gg-bb-celebration-unlocked';
     unlocked.textContent = '🌊 Bad-Habit Harbor unlocked!';

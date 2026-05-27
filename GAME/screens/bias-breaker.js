@@ -40,6 +40,20 @@ GG.screens.biasBreaker = (function() {
   var FLYER_Y_TOP  = 240;
   var FLYER_Y_STEP = 90;
 
+  // Tortoise (Mario-style enemy that walks across the current platform)
+  var TORTOISE_W = 56;
+  var TORTOISE_H = 38;
+  var TORTOISE_SPEED = 1.6;
+  var TORTOISE_FIRST_DELAY = 180;   // frames before the FIRST spawn after a section starts (~3s @ 60fps)
+  var TORTOISE_RESPAWN_MIN = 360;   // frames between spawns (6-10s)
+  var TORTOISE_RESPAWN_MAX = 600;
+  var TORTOISE_STOMP_POINTS = 20;
+  var TORTOISE_DEATH_FRAMES = 50;   // squashed animation length
+
+  // Star thresholds (time-based)
+  var STAR_TIME_GOLD   = 30;        // <= 30s = 3 stars
+  var STAR_TIME_SILVER = 40;        // <= 40s = 2 stars (else 1 star)
+
   var COMMIT_FRAMES   = 90;   // 1.5s @ 60fps to commit
   var CRASH_FRAMES    = 120;  // 2s @ 60fps anti-camp crash
 
@@ -318,8 +332,16 @@ GG.screens.biasBreaker = (function() {
       carryingFlyer: null,
       // Entry-door exit state: count frames the player stands inside the door
       entryDoorTimer: 0,
-      exitingViaEntry: false
+      exitingViaEntry: false,
+      // Timer + score
+      timeMs: 0,
+      lastShownTimer: -1,
+      score: 0,
+      // Tortoise mini-enemy
+      tortoise: null,
+      tortoiseSpawnFrame: 0          // animTime at which the next tortoise should spawn
     };
+    state.tortoiseSpawnFrame = TORTOISE_FIRST_DELAY;
 
     function onKeyDown(e) {
       keys[e.code] = true;
@@ -360,9 +382,17 @@ GG.screens.biasBreaker = (function() {
       var root = document.createElement('div');
       root.className = 'gg-bb-hud';
       var pl = document.createElement('span'); pl.className = 'gg-bb-hud-platforms'; root.appendChild(pl);
+      var tm = document.createElement('span'); tm.className = 'gg-bb-hud-timer';     root.appendChild(tm);
+      var sc = document.createElement('span'); sc.className = 'gg-bb-hud-score';     root.appendChild(sc);
+
       function setPlatforms(cur, total) { pl.textContent = 'Section: ' + cur + '/' + total; }
+      function setTimer(seconds)        { tm.textContent = '⏱ ' + seconds + 's'; }
+      function setScore(s)              { sc.textContent = '★ ' + s + ' pts'; }
+
       setPlatforms(0, level.sections.length);
-      return { root: root, setPlatforms: setPlatforms };
+      setTimer(0);
+      setScore(0);
+      return { root: root, setPlatforms: setPlatforms, setTimer: setTimer, setScore: setScore };
     }
 
     function setStreak(n) {
@@ -631,6 +661,140 @@ GG.screens.biasBreaker = (function() {
       section.flyers = newFlyers;
     }
 
+    // ---- Tortoise (Mario-style mini-enemy on the current platform) ----
+    function spawnTortoise() {
+      if (state.currentSection >= level.sections.length) return;
+      var sec = level.sections[state.currentSection];
+      if (!sec) return;
+      var solid = sec.solid;
+      var goingRight = Math.random() > 0.5;
+      state.tortoise = {
+        sectionIdx: state.currentSection,
+        x: goingRight ? solid.x + 12 : solid.x + solid.w - TORTOISE_W - 12,
+        y: SOLID_Y - TORTOISE_H,
+        vx: goingRight ? TORTOISE_SPEED : -TORTOISE_SPEED,
+        alive: true,
+        deadAt: 0,
+        legPhase: Math.random() * Math.PI * 2
+      };
+      state.tortoiseSpawnFrame = state.animTime +
+        TORTOISE_RESPAWN_MIN + Math.floor(Math.random() * (TORTOISE_RESPAWN_MAX - TORTOISE_RESPAWN_MIN));
+    }
+
+    function updateTortoise() {
+      // Spawning
+      if (!state.tortoise &&
+          state.animTime >= state.tortoiseSpawnFrame &&
+          state.currentSection < level.sections.length &&
+          !state.carryingFlyer &&
+          !state.doorEntered &&
+          !state.exitingViaEntry) {
+        spawnTortoise();
+      }
+      if (!state.tortoise) return;
+
+      var t = state.tortoise;
+      if (!t.alive) {
+        if (state.animTime - t.deadAt > TORTOISE_DEATH_FRAMES) {
+          state.tortoise = null;
+        }
+        return;
+      }
+      // Despawn if section advanced (don't leave a tortoise behind on old platform)
+      if (t.sectionIdx !== state.currentSection) {
+        state.tortoise = null;
+        return;
+      }
+      // Walk
+      t.x += t.vx;
+      var solid = level.sections[t.sectionIdx].solid;
+      if (t.vx > 0 && t.x > solid.x + solid.w + 10) state.tortoise = null;
+      if (t.vx < 0 && t.x + TORTOISE_W < solid.x - 10) state.tortoise = null;
+    }
+
+    function checkTortoiseCollision() {
+      var t = state.tortoise;
+      if (!t || !t.alive) return;
+      // AABB overlap
+      var overlap = state.x + PLAYER_W > t.x &&
+                    state.x < t.x + TORTOISE_W &&
+                    state.y + PLAYER_H > t.y &&
+                    state.y < t.y + TORTOISE_H;
+      if (!overlap) return;
+
+      var playerBottom = state.y + PLAYER_H;
+      // STOMP if the player is falling AND lands within the top band of the tortoise
+      if (state.vy > 0 && playerBottom < t.y + 22) {
+        t.alive = false;
+        t.deadAt = state.animTime;
+        state.score += TORTOISE_STOMP_POINTS;
+        hud.setScore(state.score);
+        state.vy = JUMP_SPEED * 0.7;  // bounce off
+        sfxCorrect();
+        showBanner('🐢 +' + TORTOISE_STOMP_POINTS + ' Tortoise stomped!', 'correct');
+        setTimeout(function() {
+          // Restore the section's question banner
+          showSectionBanner(state.currentSection);
+        }, 1200);
+      } else {
+        // Side bump — push player back gently, no score penalty
+        var pCenter = state.x + PLAYER_W / 2;
+        var tCenter = t.x + TORTOISE_W / 2;
+        state.vx = pCenter < tCenter ? -4 : 4;
+      }
+    }
+
+    function drawTortoise() {
+      if (!state.tortoise) return;
+      var t = state.tortoise;
+      var x = t.x - state.camX;
+      var y = t.y;
+      ctx.save();
+      if (!t.alive) {
+        var prog = (state.animTime - t.deadAt) / TORTOISE_DEATH_FRAMES;
+        y = t.y + prog * 22;        // pancake down
+        ctx.globalAlpha = Math.max(0, 1 - prog);
+      }
+      // Shell
+      ctx.fillStyle = '#4a7c3a';
+      ctx.shadowColor = 'rgba(74, 124, 58, 0.6)';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.ellipse(x + TORTOISE_W / 2, y + TORTOISE_H / 2, TORTOISE_W / 2 - 4, TORTOISE_H / 2 - 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Shell pattern (3 hexagonal dots)
+      ctx.fillStyle = '#2c4f24';
+      for (var i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(x + 16 + i * 12, y + 14, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Head (faces direction of travel)
+      var headX = t.vx > 0 ? x + TORTOISE_W - 3 : x + 3;
+      var headSide = t.vx > 0 ? 1 : -1;
+      ctx.fillStyle = '#a8d090';
+      ctx.beginPath();
+      ctx.ellipse(headX + headSide * 4, y + 22, 8, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Eye
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.arc(headX + headSide * 5, y + 20, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      // Legs (4 small ovals, walk-cycle phase)
+      ctx.fillStyle = '#a8d090';
+      var swing = Math.sin(state.animTime * 0.3 + t.legPhase) * 3;
+      var legY = y + TORTOISE_H - 3;
+      ctx.beginPath();
+      ctx.ellipse(x + 12, legY + swing,    4, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 22, legY - swing,    4, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 34, legY + swing,    4, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 44, legY - swing,    4, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // The entry door is the "left exit": walk back into it and the player
     // disappears, returning to the map without marking the island cleared.
     function checkEntryDoor() {
@@ -679,9 +843,15 @@ GG.screens.biasBreaker = (function() {
         sfxDoor();
         showBanner('You walked through! 🎉', 'correct');
         setTimeout(function() {
-          var stars = state.falls === 0 ? 3 : state.falls <= 2 ? 2 : 1;
+          var finalSec = Math.floor(state.timeMs / 1000);
+          // Time-based stars: <=30s=3 GOLD, <=40s=2 SILVER, else 1 BRONZE
+          var stars = finalSec <= STAR_TIME_GOLD   ? 3
+                    : finalSec <= STAR_TIME_SILVER ? 2
+                    :                                1;
           GG.biasBreakerCelebration.show(stageEl, {
             stars: stars,
+            time: finalSec,
+            score: state.score,
             onContinue: function() { cleanup(); onComplete({ cleared: true, stars: stars }); }
           });
         }, 900);
@@ -1179,7 +1349,18 @@ GG.screens.biasBreaker = (function() {
         }
       }
 
+      // Game timer (counts up; pauses while paused/exiting)
+      if (!state.isPaused && !state.doorEntered && !state.exitingViaEntry) {
+        state.timeMs += 1000 / 60;
+        var sec = Math.floor(state.timeMs / 1000);
+        if (sec !== state.lastShownTimer) {
+          hud.setTimer(sec);
+          state.lastShownTimer = sec;
+        }
+      }
+
       updateFlyers();
+      updateTortoise();
 
       if (!carrying) {
         checkCollisions();
@@ -1187,6 +1368,7 @@ GG.screens.biasBreaker = (function() {
         updateDwell();
         checkDoor();
         checkEntryDoor();
+        checkTortoiseCollision();
       }
       updateCamera();
 
@@ -1210,6 +1392,8 @@ GG.screens.biasBreaker = (function() {
         else s.flyers.forEach(function(f) { if (f.carrying) drawFlyer(f); });
       });
       drawDoor();
+      // Tortoise on the current platform (drawn over the solid)
+      drawTortoise();
       drawConfirmRing();
       updateAvatar();
       updateLabels();
