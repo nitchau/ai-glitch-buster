@@ -212,6 +212,11 @@ GG.screens.biasBreaker = (function() {
   function render(rootEl, profile, onComplete) {
     clearChildren(rootEl);
 
+    // Switch #gg-root into "level mode" — dark background + edge-to-edge stage.
+    // Cleaned up in cleanup() so map/onboarding/island-intro keep their bright look.
+    var ggRoot = document.getElementById('gg-root');
+    if (ggRoot) ggRoot.classList.add('gg-bb-active');
+
     var questions = GG.biasBreakerQuestions.pickN(5);
     var level = buildLevel(questions);
 
@@ -1059,6 +1064,9 @@ GG.screens.biasBreaker = (function() {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup',   onKeyUp);
       hidePauseOverlay();
+      // Restore the bright gg-root theme for non-level screens (map/onboarding)
+      var ggRoot = document.getElementById('gg-root');
+      if (ggRoot) ggRoot.classList.remove('gg-bb-active');
       try { if (_audioCtx && _audioCtx.close) _audioCtx.close(); _audioCtx = null; } catch (e) {}
     }
 
