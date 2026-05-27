@@ -118,7 +118,10 @@ GG.screens.biasBreaker = (function() {
   // ---- Level builder ----
   function buildLevel(questions) {
     var sections = [];
-    var x = 60; // start with a small gap from left wall
+    // Center the FIRST visible section in the canvas. Content per section is
+    // SOLID_W + SECTION_SPACING wide. Equal left/right margin:
+    //   leftMargin = (CANVAS_W - SOLID_W - SECTION_SPACING) / 2
+    var x = Math.max(60, Math.round((CANVAS_W - SOLID_W - SECTION_SPACING) / 2));
     for (var i = 0; i < questions.length; i++) {
       var question = questions[i];
       var solid = { type: 'solid', x: x, y: SOLID_Y, w: SOLID_W, h: 30 };
@@ -271,7 +274,8 @@ GG.screens.biasBreaker = (function() {
     });
 
     var state = {
-      x: 80, y: SOLID_Y - PLAYER_H,
+      // Player starts just inside section 0's solid (which is now centered in canvas)
+      x: level.sections[0].solid.x + 30, y: SOLID_Y - PLAYER_H,
       vx: 0, vy: 0,
       facing: 'right',
       onGround: false,
