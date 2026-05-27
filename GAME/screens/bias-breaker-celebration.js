@@ -34,8 +34,8 @@ GG.biasBreakerCelebration = (function() {
       var statsEl = document.createElement('div');
       statsEl.className = 'gg-bb-celebration-stats';
       if (typeof opts.time === 'number') {
-        var tier = opts.time <= 30 ? ' ⚡ Lightning!'
-                 : opts.time <= 40 ? ' Quick!'
+        var tier = opts.time <= 45 ? ' ⚡ Lightning!'
+                 : opts.time <= 60 ? ' Quick!'
                  :                   '';
         var ts = document.createElement('span');
         ts.textContent = '⏱ ' + opts.time + 's' + tier;

@@ -43,7 +43,7 @@ GG.screens.biasBreaker = (function() {
   // Tortoise (Mario-style enemy that walks across the current platform)
   var TORTOISE_W = 56;
   var TORTOISE_H = 38;
-  var TORTOISE_SPEED = 1.6;
+  var TORTOISE_SPEED = 1.0;
   var TORTOISE_FIRST_DELAY = 180;   // frames before the FIRST spawn after a section starts (~3s @ 60fps)
   var TORTOISE_RESPAWN_MIN = 360;   // frames between spawns (6-10s)
   var TORTOISE_RESPAWN_MAX = 600;
@@ -51,8 +51,9 @@ GG.screens.biasBreaker = (function() {
   var TORTOISE_DEATH_FRAMES = 50;   // squashed animation length
 
   // Star thresholds (time-based)
-  var STAR_TIME_GOLD   = 30;        // <= 30s = 3 stars
-  var STAR_TIME_SILVER = 40;        // <= 40s = 2 stars (else 1 star)
+  var STAR_TIME_GOLD   = 45;        // <= 45s = 3 stars
+  var STAR_TIME_SILVER = 60;        // 46-60s = 2 stars, 61-75s and beyond = 1 star
+  var STAR_TIME_BRONZE = 75;        // (informational — anything > silver yields 1 star)
 
   var COMMIT_FRAMES   = 90;   // 1.5s @ 60fps to commit
   var CRASH_FRAMES    = 120;  // 2s @ 60fps anti-camp crash
