@@ -74,3 +74,79 @@
 ---
 
 If every box is checked, Phase 1 is **DONE** — ready to move to Phase 2 (real Bias Breaker platformer gameplay).
+
+---
+
+# Phase 2 — Bias Breaker Platformer
+
+## Pre-flight
+- [ ] `python -m http.server 7891` running from repo root
+- [ ] DevTools console clean before entry
+- [ ] `http://localhost:7891/GAME/test.html` shows **12 / 12 passed**
+
+## Level entry
+- [ ] Open `http://localhost:7891/index.html`, click Play
+- [ ] Complete onboarding if first run; otherwise map appears
+- [ ] Click Bias Breaker
+- [ ] Stage loads with neon-cyber dark background, scan lines, digital rain
+- [ ] Player avatar visible on the leftmost green platform (cartoon kid with blonde curly hair, green shirt, confident face)
+- [ ] HUD top-left: "Platforms: 0/5"
+- [ ] Map UI is gone (replaced by the stage)
+
+## Movement
+- [ ] Press D — avatar runs right; legs alternate; faces right
+- [ ] Press A — avatar flips, faces left, runs left
+- [ ] Press Space — avatar jumps; descends with gravity; lands cleanly
+- [ ] Press Esc — pause overlay appears with Resume + Back to Map buttons; Resume returns to game
+
+## Questions + platform spawning
+- [ ] Walk to right edge of starting platform
+- [ ] Modal slides up from bottom with question text + 4 stacked options
+- [ ] Pick wrong answer → red feedback box with explanation appears → ~1.6s → new question loads
+- [ ] Pick correct answer → green feedback with motivation → ~0.8s → modal closes → game resumes
+- [ ] HUD updates to "Platforms: 1/5"
+- [ ] Walk right + jump to reach the next gap; repeat 4 more times
+- [ ] Each platform spawns visibly when its question is answered correctly
+
+## Boss
+- [ ] After the 5th platform, boss arena visible: Unfair Gatekeeper drawn on canvas
+- [ ] HUD shows "Gatekeeper HP: ♥♥♥"
+- [ ] Modal appears with boss-tier question
+- [ ] Correct answer → boss flashes red, one body segment cracks, one X-eye dims, HP becomes ♥♥♡
+- [ ] Repeat 2 more times → boss collapses into floating pixels (alpha fade upward)
+
+## Celebration
+- [ ] Square-pixel confetti rains in 5 colors (green, gold, pink, cyan, magenta)
+- [ ] Headline: "You freed the city!"
+- [ ] Stars displayed (⭐⭐⭐ if 0 falls, ⭐⭐☆ if 1-2, ⭐☆☆ if 3+)
+- [ ] Gold toast: "🌊 Bad-Habit Harbor unlocked!"
+- [ ] "🏠 Back to Map" button visible
+- [ ] Click Back to Map
+
+## Post-win
+- [ ] Map re-renders: Habit Harbor no longer has the chain-lock icon — it's now glowing green
+- [ ] DevTools → Application → Local Storage → `gg.profile.progress["bias-breaker"]` has `cleared: true, stars: N`
+- [ ] `gg.profile.progress["habit-harbor"].unlocked` is `true`
+- [ ] Console: still 0 red errors
+
+## Fall + restart
+- [ ] During play, jump off a platform deliberately
+- [ ] 200ms fade-to-black overlay
+- [ ] Respawn on last cleared platform; question state preserved (don't re-answer earlier questions)
+- [ ] Final stars reflect the falls counter
+
+## Returning player after a clear
+- [ ] Reload page, click Play → map shows Habit Harbor unlocked
+- [ ] Click Habit Harbor → still shows the Coming Soon island intro (it has no Phase 2 implementation yet — Phase 5+)
+- [ ] Click Bias Breaker → level plays again (within-session state resets, but Habit Harbor stays unlocked)
+
+## Console + storage edge cases
+- [ ] No red console errors during entire playthrough
+- [ ] If `localStorage.setItem` is monkey-patched to throw during the win → celebration still shows; banner on next map render
+
+## Performance
+- [ ] Smooth ~60 fps on test machine; no visible jank during platform spawns, modal transitions, or confetti
+
+---
+
+If every Phase 2 box is checked, Bias Breaker is **DONE** — first real island gameplay shipped.
