@@ -199,22 +199,42 @@
   overflow: hidden;
 }
 
-/* Confused-kid silhouettes — one per screen corner */
+/* Confused-kid silhouettes — full-body cartoon citizens, one per screen corner.
+   New SVG viewBox is 100x200 so each kid is ~1.78x as tall as wide. */
 .gg-citizen {
   position: absolute;
-  width: 110px;
-  opacity: 0.42;
+  width: 90px;
+  opacity: 0.50;
   animation: gg-citizen-bob 5s ease-in-out infinite;
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
 }
-.gg-citizen-tl { top: 14%;    left: 3%;  animation-delay: 0s;    }
-.gg-citizen-tr { top: 14%;    right: 3%; animation-delay: 1.25s; }
-.gg-citizen-bl { bottom: 18%; left: 3%;  animation-delay: 2.50s; }
-.gg-citizen-br { bottom: 18%; right: 3%; animation-delay: 3.75s; }
+.gg-citizen-tl { top: 10%;    left: 2%;  animation-delay: 0s;    }
+.gg-citizen-tr { top: 10%;    right: 2%; animation-delay: 1.25s; }
+.gg-citizen-bl { bottom: 8%;  left: 2%;  animation-delay: 2.50s; }
+.gg-citizen-br { bottom: 8%;  right: 2%; animation-delay: 3.75s; }
+
+/* Each pose gets its own subtle micro-animation on top of the body bob — adds
+   personality without making any single kid look mechanical. */
+.gg-citizen-tl { animation-name: gg-citizen-bob;        }   /* head-scratch: bob */
+.gg-citizen-tr { animation-name: gg-citizen-bob-sway;   }   /* cheek-clutch: side sway */
+.gg-citizen-bl { animation-name: gg-citizen-bob-shrug;  }   /* shrug: vertical pulse */
+.gg-citizen-br { animation-name: gg-citizen-bob-nod;    }   /* thinker: nod */
 
 @keyframes gg-citizen-bob {
-  0%, 100% { transform: translateY(0)    rotate(0deg);  }
+  0%, 100% { transform: translateY(0)    rotate(0deg);   }
   50%      { transform: translateY(-8px) rotate(1.5deg); }
+}
+@keyframes gg-citizen-bob-sway {
+  0%, 100% { transform: translateX(-3px) rotate(-1deg); }
+  50%      { transform: translateX(3px)  rotate(1deg);  }
+}
+@keyframes gg-citizen-bob-shrug {
+  0%, 100% { transform: translateY(0)    scaleX(1);    }
+  50%      { transform: translateY(-4px) scaleX(1.04); }
+}
+@keyframes gg-citizen-bob-nod {
+  0%, 100% { transform: translateY(0)    rotate(-2deg); }
+  50%      { transform: translateY(-3px) rotate(2deg);  }
 }
 
 .gg-kid-svg { width: 100%; height: auto; overflow: visible; }
