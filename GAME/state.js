@@ -62,11 +62,31 @@ GG.state = (function() {
     };
   }
 
+  function markIslandCleared(islandId, stars) {
+    var profile = load();
+    if (!profile) return { ok: false, reason: 'no-profile' };
+    if (!profile.progress[islandId]) return { ok: false, reason: 'unknown-island' };
+
+    profile.progress[islandId].cleared = true;
+    var prevStars = profile.progress[islandId].stars || 0;
+    var newStars = (typeof stars === 'number' && isFinite(stars)) ? stars : 1;
+    profile.progress[islandId].stars = Math.max(prevStars, newStars);
+
+    var order = ['bias-breaker', 'habit-harbor', 'privacy-vaults', 'reality-tower', 'the-core'];
+    var idx = order.indexOf(islandId);
+    if (idx >= 0 && idx + 1 < order.length) {
+      var next = order[idx + 1];
+      if (profile.progress[next]) profile.progress[next].unlocked = true;
+    }
+    return save(profile);
+  }
+
   return {
     load: load,
     save: save,
     reset: reset,
     isIslandUnlocked: isIslandUnlocked,
-    newProfile: newProfile
+    newProfile: newProfile,
+    markIslandCleared: markIslandCleared
   };
 })();

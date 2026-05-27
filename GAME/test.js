@@ -63,6 +63,42 @@
     assertNull(GG.state.load());
   });
 
+  test('markIslandCleared sets cleared=true and stars=N', function() {
+    GG.state.save(GG.state.newProfile('Mishika', 'guardian'));
+    var r = GG.state.markIslandCleared('bias-breaker', 2);
+    assertTrue(r.ok, 'markIslandCleared should return ok');
+    var p = GG.state.load();
+    assertEq(p.progress['bias-breaker'].cleared, true);
+    assertEq(p.progress['bias-breaker'].stars, 2);
+  });
+
+  test('markIslandCleared keeps best-of stars', function() {
+    GG.state.save(GG.state.newProfile('Mishika', 'guardian'));
+    GG.state.markIslandCleared('bias-breaker', 2);
+    GG.state.markIslandCleared('bias-breaker', 3);
+    GG.state.markIslandCleared('bias-breaker', 1);
+    var p = GG.state.load();
+    assertEq(p.progress['bias-breaker'].stars, 3, 'should not regress stars');
+  });
+
+  test('markIslandCleared unlocks the next island in canonical order', function() {
+    GG.state.save(GG.state.newProfile('Mishika', 'guardian'));
+    GG.state.markIslandCleared('bias-breaker', 1);
+    var p = GG.state.load();
+    assertEq(p.progress['habit-harbor'].unlocked, true);
+  });
+
+  test("markIslandCleared('the-core', 3) does NOT crash (no next island)", function() {
+    var profile = GG.state.newProfile('Mishika', 'guardian');
+    profile.progress['the-core'].unlocked = true;
+    GG.state.save(profile);
+    var r = GG.state.markIslandCleared('the-core', 3);
+    assertTrue(r.ok);
+    var p = GG.state.load();
+    assertEq(p.progress['the-core'].cleared, true);
+    assertEq(p.progress['the-core'].stars, 3);
+  });
+
   function render() {
     var html = '<h1>Glitch Guardians — Test Runner</h1>';
     var passed = 0;
