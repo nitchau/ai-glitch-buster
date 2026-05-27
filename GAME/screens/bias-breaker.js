@@ -612,6 +612,13 @@ GG.screens.biasBreaker = (function() {
             state.y = resp.y - PLAYER_H;
             state.vx = 0; state.vy = 0;
             state.onGround = true;
+            state.dwellTimer = 0;            // don't carry over any mid-commit progress
+            state.onFlyer = null;
+            state.carryingFlyer = null;
+            // Clear any tortoise so the player doesn't immediately get bumped
+            // again on respawn; give them the full FIRST_DELAY breathing room.
+            state.tortoise = null;
+            state.tortoiseSpawnFrame = state.animTime + TORTOISE_FIRST_DELAY;
             // Reset section's flyers for fresh attempt
             resetSection(state.currentSection);
             state.teleporting = false;
@@ -629,8 +636,13 @@ GG.screens.biasBreaker = (function() {
       section.flyers.forEach(function(f) {
         if (f.labelEl && f.labelEl.parentNode) f.labelEl.parentNode.removeChild(f.labelEl);
       });
-      // Rebuild flyers fresh
-      var gapMidX = section.solid.x + SOLID_W + 180;
+      // Rebuild flyers fresh — MUST mirror buildLevel exactly, especially the
+      // travelLeft / travelRight bounds. Without them updateFlyers computes
+      // NaN positions and the answer labels disappear (player gets stuck
+      // unable to answer). Bug surfaced when player falls before answering.
+      var solid = section.solid;
+      var travelLeft  = solid.x + SOLID_W + 30;
+      var travelRight = (solid.x + SECTION_SPACING) - 30;
       var positions = shuffle([0, 1, 2, 3]);
       var newFlyers = [];
       for (var p = 0; p < 4; p++) {
@@ -639,12 +651,14 @@ GG.screens.biasBreaker = (function() {
         var fh = flyerHeightFor(section.flyerType);
         var f = {
           type: section.flyerType,
-          baseX: gapMidX - fw / 2,
+          travelLeft: travelLeft,
+          travelRight: travelRight - fw,
           baseY: FLYER_Y_TOP + p * FLYER_Y_STEP,
-          x: gapMidX - fw / 2, y: FLYER_Y_TOP + p * FLYER_Y_STEP,
+          x: travelLeft + p * 30,
+          y: FLYER_Y_TOP + p * FLYER_Y_STEP,
           w: fw, h: fh,
           phase: Math.random() * Math.PI * 2,
-          driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.6),
+          driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.7),
           vx: 0,
           rowIndex: p,
           optionIndex: optionIdx,
