@@ -99,6 +99,24 @@
     assertEq(p.progress['the-core'].stars, 3);
   });
 
+  test('biasBreakerQuestions has exactly 8 well-formed entries', function() {
+    assertEq(GG.biasBreakerQuestions.length, 8);
+    GG.biasBreakerQuestions.forEach(function(q, i) {
+      assertTrue(!!q.id,        'q[' + i + '] missing id');
+      assertTrue(!!q.question,  'q[' + i + '] missing question');
+      assertEq(q.options.length, 4, 'q[' + i + '] should have 4 options');
+      var correctCount = q.options.filter(function(o) { return o.correct; }).length;
+      assertEq(correctCount, 1, 'q[' + i + '] should have exactly 1 correct option');
+      q.options.forEach(function(opt, j) {
+        if (opt.correct) {
+          assertTrue(!!opt.motivation, 'q[' + i + '].option[' + j + '] correct=true missing motivation');
+        } else {
+          assertTrue(!!opt.explanation, 'q[' + i + '].option[' + j + '] correct=false missing explanation');
+        }
+      });
+    });
+  });
+
   function render() {
     var html = '<h1>Glitch Guardians — Test Runner</h1>';
     var passed = 0;
