@@ -177,11 +177,13 @@ GG.screens.biasBreaker = (function() {
       w: 90, h: 150,
       open: false
     };
-    // Small "entry door" on the first platform — story element, no collision
+    // Entry door on the first platform — also acts as the "back exit":
+    // walking into it for ~0.4s sends the player back to the map.
+    // Sized + positioned so the player at the left-wall clamp is centered in it.
     var entryDoor = {
-      x: firstSolidX + 20,
-      y: SOLID_Y - 120,
-      w: 70, h: 120
+      x: firstSolidX + 10,
+      y: SOLID_Y - 130,
+      w: 90, h: 130
     };
 
     return {
@@ -292,8 +294,10 @@ GG.screens.biasBreaker = (function() {
     });
 
     var state = {
-      // Player starts just inside section 0's solid (which is now centered in canvas)
-      x: level.sections[0].solid.x + 30, y: SOLID_Y - PLAYER_H,
+      // Player spawns PAST the entry door so they don't accidentally trigger
+      // an immediate exit. Entry door is at firstSolidX+30..+100; spawn at +160
+      // gives the player ~60px of "safe" right side before they're at the door.
+      x: level.sections[0].solid.x + 160, y: SOLID_Y - PLAYER_H,
       vx: 0, vy: 0,
       facing: 'right',
       onGround: false,
@@ -311,7 +315,10 @@ GG.screens.biasBreaker = (function() {
       teleporting: false,
       doorEntered: false,
       avatarHidden: false,
-      carryingFlyer: null      // reference to the flyer carrying the player to next solid
+      carryingFlyer: null,
+      // Entry-door exit state: count frames the player stands inside the door
+      entryDoorTimer: 0,
+      exitingViaEntry: false
     };
 
     function onKeyDown(e) {
@@ -601,6 +608,41 @@ GG.screens.biasBreaker = (function() {
         newFlyers.push(f);
       }
       section.flyers = newFlyers;
+    }
+
+    // The entry door is the "left exit": walk back into it and the player
+    // disappears, returning to the map without marking the island cleared.
+    function checkEntryDoor() {
+      if (state.exitingViaEntry || state.doorEntered || state.teleporting) return;
+      // Only fires while the player is in section 0 (the only section with an entry door)
+      if (state.currentSection !== 0) return;
+
+      var d = level.entryDoor;
+      var px = state.x + PLAYER_W / 2;        // player center x
+      var pBot = state.y + PLAYER_H;          // player bottom y
+      var pTop = state.y;                     // player top y
+      var inside =
+        state.onGround && !state.onFlyer &&
+        px > d.x && px < d.x + d.w &&
+        pBot >= d.y + 20 && pTop <= d.y + d.h;
+      if (inside) {
+        state.entryDoorTimer++;
+        if (state.entryDoorTimer >= 24) {     // ~0.4s at 60fps
+          state.exitingViaEntry = true;
+          state.avatarHidden = true;
+          avatarRefs.svg.style.transition = 'opacity 0.5s, transform 0.5s';
+          avatarRefs.svg.style.opacity = '0';
+          avatarRefs.svg.style.transform += ' scale(0.4)';
+          showBanner('🚪 Heading back — see you next time!', 'info');
+          sfxDoor();
+          setTimeout(function() {
+            cleanup();
+            onComplete({ cleared: false, stars: 0 });
+          }, 800);
+        }
+      } else {
+        state.entryDoorTimer = 0;
+      }
     }
 
     function checkDoor() {
@@ -1118,6 +1160,7 @@ GG.screens.biasBreaker = (function() {
       checkLava();
       updateDwell();
       checkDoor();
+      checkEntryDoor();
       updateCamera();
 
       // ---- Render ----
