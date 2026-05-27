@@ -124,8 +124,28 @@ window.addEventListener('popstate', function() {
   }
 });
 
-// Wire launcher button on page load
+// Wire launcher button on page load + auto-resume in-game state
 document.addEventListener('DOMContentLoaded', function() {
   var btn = document.getElementById('gg-launch-button');
   if (btn) btn.addEventListener('click', GG.start);
+
+  // If the player refreshed the browser while inside an island level,
+  // jump them straight back into that level instead of starting from the
+  // main app. The active-island flag is set in screens/bias-breaker.js.
+  var activeIsland = null;
+  try { activeIsland = localStorage.getItem('gg.activeIsland'); } catch (e) {}
+  if (!activeIsland) return;
+  var profile = GG.state.load();
+  if (!profile || !profile.progress[activeIsland] || !profile.progress[activeIsland].unlocked) return;
+
+  // Defer until the rest of the document is fully wired (avatars, etc.)
+  setTimeout(function() {
+    GG.start();
+    setTimeout(function() {
+      var screenEl = document.querySelector('#gg-root .gg-screen');
+      if (!screenEl) return;
+      var fresh = GG.state.load() || profile;
+      goToIslandIntro(screenEl, fresh, activeIsland);
+    }, 60);
+  }, 60);
 });

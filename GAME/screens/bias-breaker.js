@@ -31,14 +31,12 @@ GG.screens.biasBreaker = (function() {
   var PLAYER_H   = 100;
 
   var SOLID_Y = 620;
-  var SOLID_W = 240;
-  // SECTION_SPACING is the x-distance between two consecutive solid platforms.
-  // We render only currentSection + nextSection — so this spacing dictates how
-  // far apart the 2 visible platforms sit on screen.
-  var SECTION_SPACING = 1100;
+  var SOLID_W = 340;             // longer platforms per user feedback
+  // SECTION_SPACING shrunk 30% so the player has less ground to cover between
+  // the 2 visible platforms (which makes the jumping feel snappier).
+  var SECTION_SPACING = 770;
 
-  var FLYER_DRIFT_RANGE = 95;
-  var FLYER_DRIFT_SPEED = 0.011;
+  var FLYER_DRIFT_SPEED = 0.008;
   var FLYER_Y_TOP  = 240;
   var FLYER_Y_STEP = 90;
 
@@ -118,16 +116,21 @@ GG.screens.biasBreaker = (function() {
   // ---- Level builder ----
   function buildLevel(questions) {
     var sections = [];
-    // Center the FIRST visible section in the canvas. Content per section is
-    // SOLID_W + SECTION_SPACING wide. Equal left/right margin:
-    //   leftMargin = (CANVAS_W - SOLID_W - SECTION_SPACING) / 2
+    // Center the FIRST visible section in the canvas. Equal left/right margins.
     var x = Math.max(60, Math.round((CANVAS_W - SOLID_W - SECTION_SPACING) / 2));
+    var firstSolidX = x;
+
     for (var i = 0; i < questions.length; i++) {
       var question = questions[i];
       var solid = { type: 'solid', x: x, y: SOLID_Y, w: SOLID_W, h: 30 };
       var flyerType = FLYER_TYPES[i % FLYER_TYPES.length];
 
-      var gapMidX = x + SOLID_W + 180;
+      // Flyers TRAVEL across the gap between this section's solid and the next
+      // section's solid. travelLeft/travelRight bound their horizontal motion.
+      var nextSolidX = x + SECTION_SPACING;
+      var travelLeft  = x + SOLID_W + 30;
+      var travelRight = nextSolidX - 30;
+
       var positions = shuffle([0, 1, 2, 3]);
       var flyers = [];
       for (var p = 0; p < 4; p++) {
@@ -136,21 +139,24 @@ GG.screens.biasBreaker = (function() {
         var fh = flyerHeightFor(flyerType);
         flyers.push({
           type: flyerType,
-          baseX: gapMidX - fw / 2,
+          // Travel between two anchor x's (left edge of flyer to right edge area)
+          travelLeft: travelLeft,
+          travelRight: travelRight - fw,
           baseY: FLYER_Y_TOP + p * FLYER_Y_STEP,
-          x: gapMidX - fw / 2, y: FLYER_Y_TOP + p * FLYER_Y_STEP,
+          x: travelLeft + p * 30,
+          y: FLYER_Y_TOP + p * FLYER_Y_STEP,
           w: fw, h: fh,
           phase: Math.random() * Math.PI * 2,
-          driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.6),
+          driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.7),
           vx: 0,
           rowIndex: p,
           optionIndex: optionIdx,
           optionText: question.options[optionIdx],
           isCorrect: (optionIdx === question.correct),
           color: ANSWER_COLORS[p],
-          state: 'live',                // live | crashing | gone
+          state: 'live',
           crashStart: 0,
-          carrying: false               // true when correct flyer is delivering player
+          carrying: false
         });
       }
 
@@ -164,19 +170,27 @@ GG.screens.biasBreaker = (function() {
       x += SECTION_SPACING;
     }
 
-    var finalSolid = { type: 'solid', x: x, y: SOLID_Y, w: SOLID_W * 2, h: 30, isFinish: true };
+    var finalSolid = { type: 'solid', x: x, y: SOLID_Y, w: SOLID_W * 1.5, h: 30, isFinish: true };
     var door = {
-      x: x + SOLID_W * 2 - 100,
+      x: x + SOLID_W * 1.5 - 100,
       y: SOLID_Y - 150,
       w: 90, h: 150,
       open: false
+    };
+    // Small "entry door" on the first platform — story element, no collision
+    var entryDoor = {
+      x: firstSolidX + 20,
+      y: SOLID_Y - 120,
+      w: 70, h: 120
     };
 
     return {
       sections: sections,
       finalSolid: finalSolid,
       door: door,
-      totalWidth: x + SOLID_W * 2 + 200
+      entryDoor: entryDoor,
+      firstSolidX: firstSolidX,
+      totalWidth: x + SOLID_W * 1.5 + 200
     };
   }
 
@@ -219,6 +233,10 @@ GG.screens.biasBreaker = (function() {
     // Cleaned up in cleanup() so map/onboarding/island-intro keep their bright look.
     var ggRoot = document.getElementById('gg-root');
     if (ggRoot) ggRoot.classList.add('gg-bb-active');
+
+    // Persist "currently inside Bias Breaker" so a browser refresh restores
+    // the level instead of dumping the kid back to the main app.
+    try { localStorage.setItem('gg.activeIsland', 'bias-breaker'); } catch (e) {}
 
     var questions = GG.biasBreakerQuestions.pickN(5);
     var level = buildLevel(questions);
@@ -405,7 +423,11 @@ GG.screens.biasBreaker = (function() {
           }
           // Only animate live flyers in the CURRENT section
           if (idx === state.currentSection && f.state === 'live') {
-            var newX = f.baseX + Math.sin(state.animTime * f.driftSpeed + f.phase) * FLYER_DRIFT_RANGE;
+            // Travel back-and-forth between travelLeft and travelRight via
+            // sine wave on the [0..1] range, then scale. This makes the flyer
+            // physically cross the gap between platforms, not just drift in place.
+            var t = (Math.sin(state.animTime * f.driftSpeed + f.phase) + 1) * 0.5;
+            var newX = f.travelLeft + t * (f.travelRight - f.travelLeft);
             f.vx = newX - f.x;
             f.x = newX;
             f.y = f.baseY + Math.cos(state.animTime * f.driftSpeed * 0.7 + f.phase) * 6;
@@ -630,8 +652,33 @@ GG.screens.biasBreaker = (function() {
     }
 
     function drawSolid(p) {
-      // Floating bridge with explicit underside (so it's visually clear you can walk under)
       ctx.save();
+      // Legs first (drawn underneath the platform top), from platform bottom
+      // all the way down to the lava surface
+      var legX1 = p.x - state.camX + 24;
+      var legX2 = p.x - state.camX + p.w - 30;
+      var legTop = p.y + p.h;
+      var legBottom = LAVA_Y - 2;
+      // Drop-shadow gradient legs
+      var grad = ctx.createLinearGradient(0, legTop, 0, legBottom);
+      grad.addColorStop(0, 'rgba(67, 233, 123, 0.85)');
+      grad.addColorStop(0.6, 'rgba(40, 130, 70, 0.7)');
+      grad.addColorStop(1, 'rgba(20, 60, 35, 0.6)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(legX1, legTop, 8, legBottom - legTop);
+      ctx.fillRect(legX2, legTop, 8, legBottom - legTop);
+      // Cross-bracing for visual interest
+      ctx.strokeStyle = 'rgba(67, 233, 123, 0.35)';
+      ctx.lineWidth = 2;
+      var bracings = 3;
+      for (var b = 1; b <= bracings; b++) {
+        var by = legTop + (legBottom - legTop) * (b / (bracings + 1));
+        ctx.beginPath();
+        ctx.moveTo(legX1 + 8, by); ctx.lineTo(legX2, by);
+        ctx.stroke();
+      }
+
+      // Platform top deck
       ctx.shadowColor = 'rgba(67, 233, 123, 0.6)';
       ctx.shadowBlur = 18;
       ctx.fillStyle = '#43e97b';
@@ -645,10 +692,45 @@ GG.screens.biasBreaker = (function() {
       // Underside (dark) — makes it clear you can walk under
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillRect(p.x - state.camX, p.y + p.h - 6, p.w, 6);
-      // Pillar shadows hinting at "floating"
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fillRect(p.x - state.camX + 20, p.y + p.h, 6, 20);
-      ctx.fillRect(p.x - state.camX + p.w - 26, p.y + p.h, 6, 20);
+      ctx.restore();
+    }
+
+    function drawEntryDoor() {
+      // Visual-only "you came from here" door on the first platform
+      var d = level.entryDoor;
+      var x = d.x - state.camX;
+      ctx.save();
+      // Frame
+      var grad = ctx.createLinearGradient(x, d.y, x, d.y + d.h);
+      grad.addColorStop(0, '#8a4a18');
+      grad.addColorStop(1, '#4a280c');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(x, d.y + d.h);
+      ctx.lineTo(x, d.y + 24);
+      ctx.quadraticCurveTo(x + d.w / 2, d.y - 4, x + d.w, d.y + 24);
+      ctx.lineTo(x + d.w, d.y + d.h);
+      ctx.closePath();
+      ctx.fill();
+      // Interior (open behind)
+      ctx.fillStyle = 'rgba(20, 10, 50, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(x + 10, d.y + d.h);
+      ctx.lineTo(x + 10, d.y + 36);
+      ctx.quadraticCurveTo(x + d.w / 2, d.y + 6, x + d.w - 10, d.y + 36);
+      ctx.lineTo(x + d.w - 10, d.y + d.h);
+      ctx.closePath();
+      ctx.fill();
+      // Knob
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(x + d.w - 18, d.y + d.h / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // "ENTRY" sign
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.85)';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('ENTRY', x + d.w / 2, d.y - 8);
       ctx.restore();
     }
 
@@ -1023,8 +1105,12 @@ GG.screens.biasBreaker = (function() {
         state.vy += GRAVITY;
         state.x  += state.vx;
         state.y  += state.vy;
-        // LEFT WALL — cannot go off-screen left
-        if (state.x < 0) { state.x = 0; if (state.vx < 0) state.vx = 0; }
+        // LEFT WALL — cannot go left of the first platform's left edge
+        // (story: that's where the player entered from a door, no going back)
+        if (state.x < level.firstSolidX) {
+          state.x = level.firstSolidX;
+          if (state.vx < 0) state.vx = 0;
+        }
       }
 
       updateFlyers();
@@ -1039,17 +1125,16 @@ GG.screens.biasBreaker = (function() {
       drawBackground();
       drawLava();
       // Only the CURRENT section's solid and the NEXT solid are visible.
-      // This keeps exactly 2 platforms on screen: the one the player is on,
-      // and the one they're trying to reach.
       level.sections.forEach(function(s, i) {
         if (i === state.currentSection || i === state.currentSection + 1) {
           drawSolid(s.solid);
         }
       });
-      // Final solid only appears once the player is in the last section
       if (state.currentSection >= level.sections.length - 1) {
         drawSolid(level.finalSolid);
       }
+      // Entry door on the first platform — visual only, story element
+      if (state.currentSection === 0) drawEntryDoor();
       level.sections.forEach(function(s, i) {
         if (i === state.currentSection) s.flyers.forEach(drawFlyer);
         else s.flyers.forEach(function(f) { if (f.carrying) drawFlyer(f); });
@@ -1071,6 +1156,8 @@ GG.screens.biasBreaker = (function() {
       // Restore the bright gg-root theme for non-level screens (map/onboarding)
       var ggRoot = document.getElementById('gg-root');
       if (ggRoot) ggRoot.classList.remove('gg-bb-active');
+      // Clear the "in-level" flag so the next page load doesn't auto-resume
+      try { localStorage.removeItem('gg.activeIsland'); } catch (e) {}
       try { if (_audioCtx && _audioCtx.close) _audioCtx.close(); _audioCtx = null; } catch (e) {}
     }
 
