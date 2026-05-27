@@ -79,6 +79,24 @@ function goToMap(screenEl, profile, isReturning) {
 }
 
 function goToIslandIntro(screenEl, profile, islandId) {
+  // Phase 2: Bias Breaker has real gameplay. Other islands show Coming Soon intro.
+  if (islandId === 'bias-breaker' &&
+      profile.progress['bias-breaker'] &&
+      profile.progress['bias-breaker'].unlocked &&
+      GG.screens.biasBreaker) {
+    GG.screens.biasBreaker.render(screenEl, profile, function(result) {
+      if (result && result.cleared) {
+        var saveResult = GG.state.markIslandCleared('bias-breaker', result.stars);
+        if (!saveResult.ok) {
+          showSaveBanner(document.getElementById('gg-root'));
+        }
+      }
+      var freshProfile = GG.state.load() || profile;
+      goToMap(screenEl, freshProfile, true);
+    });
+    return;
+  }
+
   GG.screens.islandIntro.render(screenEl, islandId, function() {
     goToMap(screenEl, profile, true);
   });
