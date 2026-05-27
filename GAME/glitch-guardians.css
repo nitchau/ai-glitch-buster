@@ -449,12 +449,29 @@
     radial-gradient(circle at 82% 78%, rgba(67, 233, 123, 0.10), transparent 60%),
     linear-gradient(135deg, #0a0820 0%, #1a1247 50%, #2a1857 100%);
   padding: 0;
+  /* No scrollbars inside the level — the canvas fits the viewport without scroll */
+  overflow: hidden;
 }
 #gg-root.gg-bb-active::before,
 #gg-root.gg-bb-active::after { display: none; }
+/* The router wraps screens in a centered .gg-screen with max-width: 1000px.
+   In level mode we need that wrapper to span the full gg-root so the stage
+   inside can be edge-to-edge. */
+#gg-root.gg-bb-active .gg-screen {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  z-index: auto;
+}
 #gg-root.gg-bb-active .gg-bb-stage {
-  width: 100vw;
-  max-width: 100vw;
+  /* width: 100% of the now-unconstrained .gg-screen parent */
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   border-radius: 0;
   border: none;
