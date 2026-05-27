@@ -11,20 +11,20 @@ GG.screens.islandIntro = (function() {
       icon: '⚖️'
     },
     'habit-harbor': {
-      name: 'Habit Harbor',
-      topic: 'AI Good Habits',
-      blurb: 'Glitch infected the helper-bots, and they copied bad behavior. Solve teamwork puzzles in the harbor maze to remind them what kindness, patience, and good instructions actually look like.',
+      name: 'Bad-Habit Harbor',
+      topic: 'Bad Habits in AI',
+      blurb: 'Glitch infected the helper-bots, and they copied bad behavior from the internet. Solve teamwork puzzles in the harbor maze to teach them what kindness, patience, and good instructions actually look like.',
       icon: '🌊'
     },
     'privacy-vaults': {
-      name: 'Privacy Vaults',
+      name: 'Privacy Vault',
       topic: 'Privacy & Data',
-      blurb: "Drones are leaking the city's passwords, messages, and secret files! Sneak past lasers, shut down the leaks, and learn what to share — and what to keep safe.",
+      blurb: "Drones are leaking the city's passwords, messages, and secret files! Sneak past lasers, shut down the leaks, and learn what's safe to share — and what should stay private.",
       icon: '🔐'
     },
     'reality-tower': {
-      name: 'Reality Tower',
-      topic: 'Hallucinations',
+      name: 'Hallucination Tower',
+      topic: 'AI Hallucinations',
       blurb: 'The AI is making things up — maps lead into walls, alerts point the wrong way. Climb the shifting tower and spot the fake information to find the safe path up.',
       icon: '🗼'
     },

@@ -5,19 +5,24 @@ GG.screens = GG.screens || {};
 GG.screens.map = (function() {
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
+  // IDs are stable (don't change — they're persisted in saved profiles).
+  // Display names line up with the 4 AI-safety pillars used elsewhere in the app:
+  //   bias, bad-habits, privacy, hallucination.
   var ISLANDS = [
-    { id: 'bias-breaker',   name: 'Bias Breaker',   x: 150, y: 150, icon: '⚖️' },
-    { id: 'habit-harbor',   name: 'Habit Harbor',   x: 650, y: 150, icon: '🌊' },
-    { id: 'privacy-vaults', name: 'Privacy Vaults', x: 150, y: 450, icon: '🔐' },
-    { id: 'reality-tower',  name: 'Reality Tower',  x: 650, y: 450, icon: '🗼' },
-    { id: 'the-core',       name: 'The Core',       x: 400, y: 300, icon: '💥' }
+    { id: 'bias-breaker',   name: 'Bias Breaker',        x: 150, y: 150, icon: '⚖️' },
+    { id: 'habit-harbor',   name: 'Bad-Habit Harbor',    x: 650, y: 150, icon: '🌊' },
+    { id: 'privacy-vaults', name: 'Privacy Vault',       x: 150, y: 450, icon: '🔐' },
+    { id: 'reality-tower',  name: 'Hallucination Tower', x: 650, y: 450, icon: '🗼' },
+    { id: 'the-core',       name: 'The Core',            x: 400, y: 300, icon: '💥' }
   ];
 
+  // Curved bezier paths from each corner island to The Core.
+  // Control points (cx,cy) push each curve outward so the 4 paths form a flower-petal pattern.
   var PATHS = [
-    ['bias-breaker', 'the-core'],
-    ['habit-harbor', 'the-core'],
-    ['privacy-vaults', 'the-core'],
-    ['reality-tower', 'the-core']
+    { from: 'bias-breaker',   to: 'the-core', cx: 200, cy: 290 },
+    { from: 'habit-harbor',   to: 'the-core', cx: 600, cy: 290 },
+    { from: 'privacy-vaults', to: 'the-core', cx: 200, cy: 310 },
+    { from: 'reality-tower',  to: 'the-core', cx: 600, cy: 310 }
   ];
 
   function clearChildren(el) {
@@ -40,54 +45,90 @@ GG.screens.map = (function() {
     return header;
   }
 
+  function buildDefs() {
+    // SVG <defs> — glow filter for paths and pulse for unlocked islands.
+    var defs = document.createElementNS(SVG_NS, 'defs');
+
+    // Glow filter — used by paths and unlocked island circles.
+    var filter = document.createElementNS(SVG_NS, 'filter');
+    filter.setAttribute('id', 'gg-glow');
+    filter.setAttribute('x', '-50%');
+    filter.setAttribute('y', '-50%');
+    filter.setAttribute('width', '200%');
+    filter.setAttribute('height', '200%');
+
+    var blur = document.createElementNS(SVG_NS, 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '4');
+    blur.setAttribute('result', 'coloredBlur');
+    filter.appendChild(blur);
+
+    var merge = document.createElementNS(SVG_NS, 'feMerge');
+    var mn1 = document.createElementNS(SVG_NS, 'feMergeNode');
+    mn1.setAttribute('in', 'coloredBlur');
+    var mn2 = document.createElementNS(SVG_NS, 'feMergeNode');
+    mn2.setAttribute('in', 'SourceGraphic');
+    merge.appendChild(mn1);
+    merge.appendChild(mn2);
+    filter.appendChild(merge);
+
+    defs.appendChild(filter);
+    return defs;
+  }
+
   function buildIsland(meta, unlocked, onSelect, onLockedClick) {
-    var g = document.createElementNS(SVG_NS, 'g');
-    g.setAttribute('class', 'gg-island ' + (unlocked ? 'gg-unlocked' : 'gg-locked'));
-    g.setAttribute('transform', 'translate(' + meta.x + ',' + meta.y + ')');
-    g.setAttribute('tabindex', '0');
-    g.setAttribute('role', 'button');
-    g.setAttribute('aria-label', meta.name + (unlocked ? ', unlocked. Click to enter.' : ', locked.'));
+    // Outer <g> handles positioning via SVG transform attribute — NEVER touched by CSS.
+    // Inner <g> handles all CSS effects (hover, wiggle, etc.). This separation
+    // prevents CSS transform from clobbering the SVG translate (the wobble bug).
+    var positionGroup = document.createElementNS(SVG_NS, 'g');
+    positionGroup.setAttribute('transform', 'translate(' + meta.x + ',' + meta.y + ')');
+
+    var fxGroup = document.createElementNS(SVG_NS, 'g');
+    fxGroup.setAttribute('class', 'gg-island ' + (unlocked ? 'gg-unlocked' : 'gg-locked'));
+    fxGroup.setAttribute('tabindex', '0');
+    fxGroup.setAttribute('role', 'button');
+    fxGroup.setAttribute('aria-label', meta.name + (unlocked ? ', unlocked. Click to enter.' : ', locked.'));
 
     var circle = document.createElementNS(SVG_NS, 'circle');
     circle.setAttribute('r', '60');
     circle.setAttribute('class', 'gg-island-circle');
-    g.appendChild(circle);
+    fxGroup.appendChild(circle);
 
     var icon = document.createElementNS(SVG_NS, 'text');
     icon.setAttribute('text-anchor', 'middle');
     icon.setAttribute('dominant-baseline', 'central');
     icon.setAttribute('font-size', '38');
     icon.textContent = unlocked ? meta.icon : '🔒';
-    g.appendChild(icon);
+    fxGroup.appendChild(icon);
 
     var label = document.createElementNS(SVG_NS, 'text');
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('y', '90');
     label.setAttribute('class', 'gg-island-label');
     label.textContent = meta.name;
-    g.appendChild(label);
+    fxGroup.appendChild(label);
 
     function handleSelect() {
       if (unlocked) {
         onSelect(meta.id);
       } else {
-        g.classList.remove('gg-wiggle');
+        fxGroup.classList.remove('gg-wiggle');
         // Force browser to reflow so the animation can be re-triggered
-        void g.getBoundingClientRect();
-        g.classList.add('gg-wiggle');
+        void fxGroup.getBoundingClientRect();
+        fxGroup.classList.add('gg-wiggle');
         onLockedClick(meta.name);
       }
     }
 
-    g.addEventListener('click', handleSelect);
-    g.addEventListener('keydown', function(e) {
+    fxGroup.addEventListener('click', handleSelect);
+    fxGroup.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         handleSelect();
       }
     });
 
-    return g;
+    positionGroup.appendChild(fxGroup);
+    return positionGroup;
   }
 
   function render(rootEl, profile, isReturning, onIslandSelect) {
@@ -99,19 +140,22 @@ GG.screens.map = (function() {
     var byId = {};
     ISLANDS.forEach(function(i) { byId[i.id] = i; });
 
-    // SVG
+    // SVG with defs for glow
     var svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 800 600');
     svg.setAttribute('class', 'gg-map-svg');
+    svg.appendChild(buildDefs());
 
-    // Paths first (drawn beneath islands)
+    // Curved bezier paths (drawn beneath islands)
     PATHS.forEach(function(p) {
-      var a = byId[p[0]], b = byId[p[1]];
-      var line = document.createElementNS(SVG_NS, 'line');
-      line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
-      line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-      line.setAttribute('class', 'gg-map-path');
-      svg.appendChild(line);
+      var a = byId[p.from], b = byId[p.to];
+      var pathEl = document.createElementNS(SVG_NS, 'path');
+      var d = 'M ' + a.x + ' ' + a.y +
+              ' Q ' + p.cx + ' ' + p.cy +
+              ' ' + b.x + ' ' + b.y;
+      pathEl.setAttribute('d', d);
+      pathEl.setAttribute('class', 'gg-map-path');
+      svg.appendChild(pathEl);
     });
 
     // Tooltip (one, reused)
