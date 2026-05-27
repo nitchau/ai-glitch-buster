@@ -51,9 +51,9 @@ GG.screens.biasBreaker = (function() {
   var TORTOISE_DEATH_FRAMES = 50;   // squashed animation length
 
   // Star thresholds (time-based)
-  var STAR_TIME_GOLD   = 45;        // <= 45s = 3 stars
-  var STAR_TIME_SILVER = 60;        // 46-60s = 2 stars, 61-75s and beyond = 1 star
-  var STAR_TIME_BRONZE = 75;        // (informational — anything > silver yields 1 star)
+  var STAR_TIME_GOLD   = 90;        // <= 90s = 3 stars
+  var STAR_TIME_SILVER = 120;       // 91-120s = 2 stars, 120s+ = 1 star
+  var STAR_TIME_BRONZE = 121;       // (informational — anything > silver yields 1 star)
 
   var COMMIT_FRAMES   = 90;   // 1.5s @ 60fps to commit
   var CRASH_FRAMES    = 120;  // 2s @ 60fps anti-camp crash
@@ -428,18 +428,34 @@ GG.screens.biasBreaker = (function() {
             return;
           }
           if (f.carrying) {
-            // Flyer descending while carrying player TOWARD next solid platform
+            // Flyer descending while carrying player TOWARD next solid platform.
+            // Two-phase approach:
+            //  - Far away  -> exponential lerp (smooth visual)
+            //  - Close in  -> snap to target so the player doesn't visibly hang
+            //                 in the air beside the platform (was a ~1.3s lag).
             var nextSolid = level.sections[state.currentSection + 1] ?
               level.sections[state.currentSection + 1].solid : level.finalSolid;
             var targetX = nextSolid.x + 30;
             // Target so the flyer's TOP is just above the platform surface; the
             // player's bottom (= f.y) then sits right at the platform's top.
             var targetY = nextSolid.y - 0;
-            var dx = (targetX - f.x) * 0.06;
-            var dy = (targetY - f.y) * 0.06;
-            f.vx = dx;
-            f.x += dx;
-            f.y += dy;
+            var remX = targetX - f.x;
+            var remY = targetY - f.y;
+            var dist = Math.sqrt(remX * remX + remY * remY);
+            if (dist < 20) {
+              // Snap — close enough that the lerp tail would feel like hanging.
+              f.x = targetX;
+              f.y = targetY;
+              f.vx = 0;
+            } else {
+              // Higher decay rate (0.18 vs old 0.06) so the descent is brisk
+              // even before the snap threshold kicks in.
+              var dx = remX * 0.18;
+              var dy = remY * 0.18;
+              f.vx = dx;
+              f.x += dx;
+              f.y += dy;
+            }
 
             // LOCK player to the flyer during transit — overrides gravity so
             // the player doesn't fall through into the lava
@@ -451,7 +467,7 @@ GG.screens.biasBreaker = (function() {
               state.onGround = true;
             }
 
-            // Arrival check
+            // Arrival check — now reliably fires the very frame after snap.
             if (Math.abs(f.x - targetX) < 4 && Math.abs(f.y - targetY) < 4) {
               // Drop the player onto the solid platform — snap exactly
               state.onFlyer = null;
