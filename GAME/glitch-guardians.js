@@ -34,13 +34,26 @@ function clearChildren(el) {
 }
 
 function doExit() {
+  // If a screen has registered a cleanup callback (e.g. bias-breaker's level),
+  // run it FIRST so it can release rAF, listeners, level-mode CSS class, and
+  // any persisted flags before the gg-root is hidden.
+  if (GG._activeCleanup) {
+    try { GG._activeCleanup(); } catch (e) {}
+    GG._activeCleanup = null;
+  }
+
   var container = document.querySelector('.container');
   var ggRoot = document.getElementById('gg-root');
   if (container) container.style.display = '';
   if (ggRoot) {
     ggRoot.hidden = true;
+    // Defensive: even if no _activeCleanup ran, scrub the active-level CSS
+    // class so a later Play-button click doesn't inherit dark/flex layout.
+    ggRoot.classList.remove('gg-bb-active');
     clearChildren(ggRoot);
   }
+  // Clear any persisted "in level" flag so the next page load doesn't auto-resume.
+  try { localStorage.removeItem('gg.activeIsland'); } catch (e) {}
 }
 
 function routeFromState() {

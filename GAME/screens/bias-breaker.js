@@ -1229,7 +1229,14 @@ GG.screens.biasBreaker = (function() {
       // Clear the "in-level" flag so the next page load doesn't auto-resume
       try { localStorage.removeItem('gg.activeIsland'); } catch (e) {}
       try { if (_audioCtx && _audioCtx.close) _audioCtx.close(); _audioCtx = null; } catch (e) {}
+      // Release the active-cleanup hook (router will call cleanup on its own
+      // path if user exits via Back-to-App; clearing here avoids double-run)
+      if (window.GG && window.GG._activeCleanup === cleanup) window.GG._activeCleanup = null;
     }
+
+    // Register this cleanup so the router's doExit() (triggered by Back-to-App
+    // button or browser-back) can invoke it before tearing down gg-root.
+    window.GG._activeCleanup = cleanup;
 
     requestAnimationFrame(tick);
   }
