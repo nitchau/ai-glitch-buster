@@ -118,6 +118,40 @@
     assertTrue(GG.biasBreakerQuestions.size() > 0, 'pool should not be empty');
   });
 
+  // --- Bad-Habit Harbor (Phase 1) ---
+
+  test('habitHarborQuestions.pickN(5) returns 5 well-formed questions', function() {
+    var qs = GG.habitHarborQuestions.pickN(5);
+    assertEq(qs.length, 5);
+    qs.forEach(function(q, i) {
+      assertTrue(!!q.question, 'q[' + i + '] missing question');
+      assertEq(q.options.length, 4, 'q[' + i + '] should have 4 options');
+      assertTrue(typeof q.correct === 'number' && q.correct >= 0 && q.correct < 4,
+                 'q[' + i + '].correct should be a 0-3 index');
+      q.options.forEach(function(opt, j) {
+        assertTrue(typeof opt === 'string' && opt.length > 0,
+                   'q[' + i + '].option[' + j + '] should be a non-empty string');
+      });
+    });
+  });
+
+  test('habitHarborQuestions.size() returns positive count', function() {
+    assertTrue(GG.habitHarborQuestions.size() > 0, 'pool should not be empty');
+  });
+
+  test('habitHarborMaze is solvable (all 5 bots + exit reachable)', function() {
+    var model = GG.habitHarborMaze.build();
+    assertTrue(GG.habitHarborMaze.validateSolvable(model), 'maze should be solvable');
+  });
+
+  test('habitHarborMaze has 5 bots, 5 gates, 1 spawn, 1 exit', function() {
+    var model = GG.habitHarborMaze.build();
+    assertEq(model.bots.length, 5);
+    assertEq(model.gates.length, 5);
+    assertTrue(!!model.spawn, 'should have a spawn');
+    assertTrue(!!model.exit, 'should have an exit');
+  });
+
   function render() {
     var html = '<h1>Glitch Guardians — Test Runner</h1>';
     var passed = 0;

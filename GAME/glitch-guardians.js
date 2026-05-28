@@ -50,6 +50,7 @@ function doExit() {
     // Defensive: even if no _activeCleanup ran, scrub the active-level CSS
     // class so a later Play-button click doesn't inherit dark/flex layout.
     ggRoot.classList.remove('gg-bb-active');
+    ggRoot.classList.remove('gg-hh-active');
     clearChildren(ggRoot);
   }
   // Clear any persisted "in level" flag so the next page load doesn't auto-resume.
@@ -100,6 +101,25 @@ function goToIslandIntro(screenEl, profile, islandId) {
     GG.screens.biasBreaker.render(screenEl, profile, function(result) {
       if (result && result.cleared) {
         var saveResult = GG.state.markIslandCleared('bias-breaker', result.stars);
+        if (!saveResult.ok) {
+          showSaveBanner(document.getElementById('gg-root'));
+        }
+      }
+      var freshProfile = GG.state.load() || profile;
+      goToMap(screenEl, freshProfile, true);
+    });
+    return;
+  }
+
+  // Phase 3 (Bad-Habit Harbor): top-down maze gameplay. Mirrors the
+  // bias-breaker branch above.
+  if (islandId === 'habit-harbor' &&
+      profile.progress['habit-harbor'] &&
+      profile.progress['habit-harbor'].unlocked &&
+      GG.screens.habitHarbor) {
+    GG.screens.habitHarbor.render(screenEl, profile, function(result) {
+      if (result && result.cleared) {
+        var saveResult = GG.state.markIslandCleared('habit-harbor', result.stars);
         if (!saveResult.ok) {
           showSaveBanner(document.getElementById('gg-root'));
         }

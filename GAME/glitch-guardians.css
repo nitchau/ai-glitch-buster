@@ -480,6 +480,50 @@
 
 .gg-bb-canvas { display: block; width: 100%; height: auto; }
 
+/* ---- Bad-Habit Harbor (top-down maze) — mirrors the .gg-bb-* stage theme,
+   water-tinted. Added in Phase 1. ---- */
+.gg-hh-stage {
+  position: relative;
+  width: 98vw;
+  max-width: 1900px;
+  margin: 48px auto 20px auto;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6), inset 0 0 80px rgba(20, 90, 120, 0.25);
+  border: 1px solid rgba(56, 249, 215, 0.4);
+  background: #0a2030;
+}
+#gg-root.gg-hh-active {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(20, 120, 150, 0.20), transparent 60%),
+    radial-gradient(circle at 82% 78%, rgba(56, 249, 215, 0.10), transparent 60%),
+    linear-gradient(135deg, #06141f 0%, #0a2738 50%, #0c3a4a 100%);
+  padding: 0;
+  overflow: hidden;
+}
+#gg-root.gg-hh-active::before,
+#gg-root.gg-hh-active::after { display: none; }
+#gg-root.gg-hh-active .gg-screen {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  z-index: auto;
+}
+#gg-root.gg-hh-active .gg-hh-stage {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+.gg-hh-canvas { display: block; width: 100%; height: auto; }
+
 /* Overlay holds the question banner and answer-platform labels.
    Positioned exactly over the canvas so labels can be in canvas-coords. */
 .gg-bb-overlay {
