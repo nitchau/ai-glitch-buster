@@ -182,7 +182,7 @@ GAME/
 |---|-------|-------------|--------|----------|---------|----------|
 | 1 | Foundation & maze model | Question adapter, maze data model, router wiring, static render of maze + boat, tests | complete | - | - | `.claude/PRPs/plans/completed/bad-habit-harbor-phase-1.plan.md` |
 | 2 | Movement & controls | Top-down 4-dir movement, wall collision, on-screen D-pad + keyboard, water/wall rendering | complete | - | 1 | `.claude/PRPs/plans/completed/bad-habit-harbor-phase-2.plan.md` |
-| 3 | Bots, rescue & gates | Bot entities + glitch art, drive-into-bot quiz modal, correct=fix+lift gate, wrong=explain+new Q, HUD (rescued X/5, timer) | pending | - | 2 | - |
+| 3 | Bots, rescue & gates | Bot entities + glitch art, drive-into-bot quiz modal, correct=fix+lift gate, wrong=explain+new Q, HUD (rescued X/5, timer) | in-progress | - | 2 | `.claude/PRPs/plans/bad-habit-harbor-phase-3.plan.md` |
 | 4 | Win, celebration & polish | Harbor-mouth gate, celebration clone, time-based stars, mark cleared→unlock, refresh-persist, cleanup, (Should) followers + sfx, PLAYTEST + QA | pending | - | 3 | - |
 
 ### Phase Details
