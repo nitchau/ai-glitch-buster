@@ -85,8 +85,16 @@ GG.screens.habitHarbor = (function() {
       px: model.spawn ? model.spawn.c * CELL + CELL / 2 : CELL,
       py: model.spawn ? model.spawn.r * CELL + CELL / 2 : CELL,
       angle: 0,          // bow faces +x
-      openGates: {}      // Phase 3 will populate this on each rescue
+      openGates: {},     // populated on each rescue (consumed by isWall)
+      paused: false,     // true while a quiz modal is open
+      rescuedCount: 0,
+      timeMs: 0,
+      lastSec: -1,
+      activeBot: null,
+      qPool: []          // shuffled question pool, refilled when empty
     };
+    // Each bot starts un-rescued (glitching).
+    model.bots.forEach(function (b) { b.rescued = false; });
 
     // Keyboard input (arrows + WASD) feeds the same `keys` object as the D-pad.
     function onKeyDown(e) {
@@ -112,6 +120,7 @@ GG.screens.habitHarbor = (function() {
       return false;
     }
     function updateBoat() {
+      if (state.paused) return;   // frozen while a quiz modal is open
       var goL = keys.ArrowLeft || keys.KeyA, goR = keys.ArrowRight || keys.KeyD,
           goU = keys.ArrowUp || keys.KeyW,   goD = keys.ArrowDown || keys.KeyS;
       var dx = (goR ? 1 : 0) - (goL ? 1 : 0), dy = (goD ? 1 : 0) - (goU ? 1 : 0);
@@ -122,6 +131,116 @@ GG.screens.habitHarbor = (function() {
       else if (dx < 0) state.angle = Math.PI;
       else if (dy > 0) state.angle = Math.PI / 2;
       else if (dy < 0) state.angle = -Math.PI / 2;
+    }
+
+    // ---- HUD (rescued count + count-up timer) ----
+    function buildHUD() {
+      var root = document.createElement('div');
+      root.className = 'gg-hh-hud';
+      var rc = document.createElement('span'); rc.className = 'gg-hh-hud-rescued'; root.appendChild(rc);
+      var tm = document.createElement('span'); tm.className = 'gg-hh-hud-timer'; root.appendChild(tm);
+      function setRescued(n, total) { rc.textContent = '🤖 Rescued ' + n + '/' + total; }
+      function setTimer(s) { tm.textContent = '⏱ ' + s + 's'; }
+      setRescued(0, model.bots.length);
+      setTimer(0);
+      return { root: root, setRescued: setRescued, setTimer: setTimer };
+    }
+    var hud = buildHUD();
+    stageEl.appendChild(hud.root);
+
+    // ---- floating banner ----
+    var banner = document.createElement('div');
+    banner.className = 'gg-hh-banner';
+    banner.hidden = true;
+    stageEl.appendChild(banner);
+    var bannerTimer = null;
+    function showBanner(text, kind) {
+      banner.textContent = text;
+      banner.className = 'gg-hh-banner gg-hh-banner-' + (kind || 'info');
+      banner.hidden = false;
+      if (bannerTimer) clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(function () { banner.hidden = true; }, 1700);
+    }
+
+    // ---- quiz modal + rescue ----
+    function nextQuestion() {
+      if (!state.qPool.length) state.qPool = GG.habitHarborQuestions.pickN(GG.habitHarborQuestions.size());
+      return state.qPool.pop();
+    }
+    var modalEl = null;
+    function openQuiz(bot) {
+      state.paused = true;
+      state.activeBot = bot;
+      renderQuiz(nextQuestion(), bot, null);
+    }
+    function renderQuiz(q, bot, explainText) {
+      if (modalEl && modalEl.parentNode) modalEl.parentNode.removeChild(modalEl);
+      modalEl = document.createElement('div');
+      modalEl.className = 'gg-hh-modal';
+
+      var lead = document.createElement('p');
+      lead.className = 'gg-hh-modal-lead';
+      lead.textContent = 'This helper-bot picked up a bad habit:';
+      modalEl.appendChild(lead);
+
+      if (explainText) {
+        var ex = document.createElement('p');
+        ex.className = 'gg-hh-explain';
+        ex.textContent = explainText;
+        modalEl.appendChild(ex);
+      }
+
+      var qEl = document.createElement('p');
+      qEl.className = 'gg-hh-modal-q';
+      qEl.textContent = q.question;
+      modalEl.appendChild(qEl);
+
+      var choices = GG.habitHarborQuestions.toChoices(q);
+      choices.forEach(function (ch) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'gg-hh-opt';
+        b.textContent = ch.text;
+        b.addEventListener('click', function () { answer(ch, bot); });
+        modalEl.appendChild(b);
+      });
+      stageEl.appendChild(modalEl);
+    }
+    function answer(choice, bot) {
+      if (choice.isCorrect) {
+        rescue(bot);
+        closeModal();
+      } else {
+        // never punishes — friendly nudge + a fresh question
+        renderQuiz(nextQuestion(), bot, "🙅 Not quite — that's still a bad habit. Look for the kind, clear, honest choice!");
+      }
+    }
+    function closeModal() {
+      if (modalEl && modalEl.parentNode) modalEl.parentNode.removeChild(modalEl);
+      modalEl = null;
+      state.paused = false;
+      state.activeBot = null;
+    }
+    function rescue(bot) {
+      bot.rescued = true;
+      state.openGates[bot.gate] = true;   // movement collision reads this immediately
+      state.rescuedCount++;
+      hud.setRescued(state.rescuedCount, model.bots.length);
+      if (state.rescuedCount >= model.bots.length) {
+        showBanner('🎉 All bots freed! Find the harbor mouth →', 'good');
+      } else {
+        showBanner('🤖 Fixed! A gate opened ✓', 'good');
+      }
+    }
+    function checkBotCollision() {
+      if (state.paused) return;
+      for (var i = 0; i < model.bots.length; i++) {
+        var b = model.bots[i];
+        if (b.rescued) continue;
+        var bxc = b.c * CELL + CELL / 2, byc = b.r * CELL + CELL / 2;
+        var dx = state.px - bxc, dy = state.py - byc;
+        if (dx * dx + dy * dy < (CELL * 0.6) * (CELL * 0.6)) { openQuiz(b); return; }
+      }
     }
 
     // ---- drawing helpers (top-down) ----
@@ -216,6 +335,13 @@ GG.screens.habitHarbor = (function() {
 
     function drawGate(gate) {
       var x = cx(gate.c), y = cy(gate.r);
+      if (state.openGates[gate.id]) {
+        // opened — two faded side posts show the gate has lifted
+        ctx.fillStyle = 'rgba(120, 90, 50, 0.5)';
+        ctx.fillRect(x + 4, y + CELL / 2 - 12, 6, 24);
+        ctx.fillRect(x + CELL - 10, y + CELL / 2 - 12, 6, 24);
+        return;
+      }
       // closed boom barrier with hazard stripes
       ctx.save();
       ctx.fillStyle = '#1a1a22';
@@ -254,6 +380,24 @@ GG.screens.habitHarbor = (function() {
     }
 
     function drawBot(b) {
+      if (b.rescued) {
+        // healed: calm green bot, smiling, no glitch jitter or "?"
+        var hx = cx(b.c), hy = cy(b.r);
+        ctx.save();
+        ctx.fillStyle = '#43e97b';
+        ctx.shadowColor = 'rgba(67, 233, 123, 0.6)';
+        ctx.shadowBlur = 10;
+        roundRect(ctx, hx + 12, hy + 16, CELL - 24, CELL - 28, 8);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#0a2738';
+        ctx.beginPath(); ctx.arc(hx + CELL / 2 - 9, hy + 30, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(hx + CELL / 2 + 9, hy + 30, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#0a2738'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(hx + CELL / 2, hy + 34, 8, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+        ctx.restore();
+        return;
+      }
       var jitter = Math.sin(state.t * 0.25 + b.c * 1.7) * 2;
       var x = cx(b.c) + jitter, y = cy(b.r);
       ctx.save();
@@ -382,7 +526,14 @@ GG.screens.habitHarbor = (function() {
     function tick() {
       if (!state.running) return;
       state.t++;
+      // count-up timer, paused while a quiz modal is open (feeds Phase 4 stars)
+      if (!state.paused) {
+        state.timeMs += 1000 / 60;
+        var s = Math.floor(state.timeMs / 1000);
+        if (s !== state.lastSec) { hud.setTimer(s); state.lastSec = s; }
+      }
       updateBoat();
+      checkBotCollision();
       drawScene();
       requestAnimationFrame(tick);
     }

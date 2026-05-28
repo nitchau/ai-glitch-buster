@@ -168,6 +168,27 @@
     assertFalse(GG.habitHarborMaze.isWall(m, g.c, g.r, open), 'opened gate is passable');
   });
 
+  // --- Bad-Habit Harbor (Phase 3: quiz choices) ---
+
+  test('habitHarborQuestions.toChoices returns 4 choices with exactly one correct', function() {
+    var q = GG.habitHarborQuestions.pickN(1)[0];
+    var ch = GG.habitHarborQuestions.toChoices(q);
+    assertEq(ch.length, 4);
+    var n = 0;
+    ch.forEach(function(c) { if (c.isCorrect) n++; });
+    assertEq(n, 1, 'exactly one correct choice');
+  });
+
+  test('habitHarborQuestions.toChoices preserves option texts + correct mapping', function() {
+    var q = GG.habitHarborQuestions.pickN(1)[0];
+    var ch = GG.habitHarborQuestions.toChoices(q);
+    var texts = ch.map(function(c) { return c.text; }).sort();
+    var orig = q.options.slice().sort();
+    assertEq(texts, orig, 'same set of option texts');
+    var correct = ch.filter(function(c) { return c.isCorrect; })[0];
+    assertEq(correct.text, q.options[q.correct], 'correct flag on the right text');
+  });
+
   function render() {
     var html = '<h1>Glitch Guardians — Test Runner</h1>';
     var passed = 0;

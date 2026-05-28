@@ -64,9 +64,24 @@ GG.habitHarborQuestions = (function() {
     return getSource().length;
   }
 
+  // Turn a question into a shuffled list of choices, each tagged isCorrect.
+  // The bank stores the correct answer at index `correct` (0 by convention),
+  // so we MUST shuffle or the right answer is always first. Does not mutate q.
+  function toChoices(q) {
+    var idx = [0, 1, 2, 3];
+    for (var i = idx.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+    }
+    return idx.map(function (oi) {
+      return { text: q.options[oi], isCorrect: oi === q.correct };
+    });
+  }
+
   return {
     pickN: pickN,
     size: size,
-    getSource: getSource
+    getSource: getSource,
+    toChoices: toChoices
   };
 })();

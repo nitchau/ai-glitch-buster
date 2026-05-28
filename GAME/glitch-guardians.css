@@ -565,6 +565,83 @@
 .gg-hh-right { grid-area: right; }
 .gg-hh-down  { grid-area: down; }
 
+/* ---- Bad-Habit Harbor HUD / banner / quiz modal (Phase 3) ---- */
+.gg-hh-hud {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 5;
+  background: rgba(10, 30, 45, 0.6);
+  padding: 8px 14px;
+  border-radius: 12px;
+  color: #cfeefe;
+  font-weight: bold;
+  font-size: 1.05em;
+  pointer-events: none;
+}
+.gg-hh-hud-rescued { display: block; }
+.gg-hh-hud-timer { display: block; margin-top: 4px; color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+
+.gg-hh-banner {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  padding: 10px 22px;
+  border-radius: 14px;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #06141f;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  max-width: 80%;
+  text-align: center;
+}
+.gg-hh-banner-good { background: #43e97b; }
+.gg-hh-banner-info { background: #cfeefe; }
+
+.gg-hh-modal {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(560px, 92%);
+  background: #ffffff;
+  color: #15234a;
+  border-radius: 18px;
+  padding: 16px 18px 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  animation: gg-fade-in-up 0.25s ease-out both;
+}
+.gg-hh-modal-lead { margin: 0 0 4px; font-size: 0.95em; color: #5b6b8c; }
+.gg-hh-modal-q { margin: 0 0 12px; font-size: 1.25em; font-weight: bold; line-height: 1.25; }
+.gg-hh-explain {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff3d4;
+  color: #8a5a00;
+  font-size: 0.98em;
+}
+.gg-hh-opt {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 14px 16px;
+  font-size: 1.05em;
+  text-align: left;
+  background: #eef4ff;
+  color: #15234a;
+  border: 2px solid #c7d6f2;
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.gg-hh-opt:active { background: #43e97b; border-color: #2bb45e; color: #06141f; }
+
 /* Overlay holds the question banner and answer-platform labels.
    Positioned exactly over the canvas so labels can be in canvas-coords. */
 .gg-bb-overlay {
