@@ -80,15 +80,29 @@ GG.screens.habitHarbor = (function() {
     }
 
     function drawWall(c, r) {
-      var x = cx(c), y = cy(r);
-      ctx.fillStyle = '#6b4a2b';                 // dock wood
-      roundRect(ctx, x + 2, y + 2, CELL - 4, CELL - 4, 8);
+      var x = cx(c) + 2, y = cy(r) + 2, w = CELL - 4, h = CELL - 4;
+      var g = ctx.createLinearGradient(0, y, 0, y + h);
+      g.addColorStop(0, '#7c5734');
+      g.addColorStop(1, '#563c22');
+      ctx.fillStyle = g;
+      roundRect(ctx, x, y, w, h, 7);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255, 220, 160, 0.18)'; // top plank highlight
-      ctx.fillRect(x + 6, y + 6, CELL - 12, 6);
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 2, y + 2, CELL - 4, CELL - 4);
+      // horizontal plank seams
+      ctx.strokeStyle = 'rgba(38, 24, 11, 0.5)';
+      ctx.lineWidth = 1.5;
+      for (var i = 1; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + (h / 3) * i);
+        ctx.lineTo(x + w - 4, y + (h / 3) * i);
+        ctx.stroke();
+      }
+      // top plank highlight + crisp outline
+      ctx.fillStyle = 'rgba(255, 226, 172, 0.16)';
+      ctx.fillRect(x + 5, y + 4, w - 10, 4);
+      ctx.strokeStyle = 'rgba(18, 11, 5, 0.5)';
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, x, y, w, h, 7);
+      ctx.stroke();
     }
 
     function drawGate(gate) {
@@ -168,29 +182,82 @@ GG.screens.habitHarbor = (function() {
       ctx.restore();
     }
 
+    // Reusable hull outline (rounded stern at -x, pointed bow at +x).
+    function hullPath(L, W, insetL, insetW) {
+      var hl = L - insetL, hw = W - insetW;
+      ctx.beginPath();
+      ctx.moveTo(-hl * 0.82, -hw);
+      ctx.quadraticCurveTo(hl * 0.55, -hw * 1.10, hl, 0);          // stern-top -> bow tip
+      ctx.quadraticCurveTo(hl * 0.55, hw * 1.10, -hl * 0.82, hw);  // bow tip -> stern-bottom
+      ctx.quadraticCurveTo(-hl * 1.14, 0, -hl * 0.82, -hw);        // round the stern
+      ctx.closePath();
+    }
+
     function drawBoat() {
       if (!model.spawn) return;
       var x = cx(model.spawn.c), y = cy(model.spawn.r);
-      var bob = Math.sin(state.t * 0.06) * 2;
+      var bob = Math.sin(state.t * 0.06) * 1.5;
+      var L = CELL * 0.58;   // half length (bow points +x, into the maze)
+      var W = CELL * 0.30;   // half width
       ctx.save();
       ctx.translate(x + CELL / 2, y + CELL / 2 + bob);
-      // hull (pointed bow facing right)
-      ctx.fillStyle = '#b5793b';
-      ctx.beginPath();
-      ctx.moveTo(-CELL * 0.32, -CELL * 0.18);
-      ctx.lineTo(CELL * 0.22, -CELL * 0.18);
-      ctx.lineTo(CELL * 0.40, 0);
-      ctx.lineTo(CELL * 0.22, CELL * 0.18);
-      ctx.lineTo(-CELL * 0.32, CELL * 0.18);
-      ctx.closePath();
+
+      // wake foam trailing off the stern
+      ctx.fillStyle = 'rgba(220, 245, 255, 0.16)';
+      for (var wf = 0; wf < 3; wf++) {
+        ctx.beginPath();
+        ctx.arc(-L - 6 - wf * 7, 0, 7 - wf * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // oars — the key top-down "rowboat" cue
+      ctx.strokeStyle = '#7a4f25';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.fillStyle = '#caa06a';
+      ctx.beginPath(); ctx.moveTo(-L * 0.10, -W * 0.5); ctx.lineTo(-L * 0.55, -W * 1.7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-L * 0.60, -W * 1.9, 7, 4, -0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-L * 0.10,  W * 0.5); ctx.lineTo(-L * 0.55,  W * 1.7); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-L * 0.60,  W * 1.9, 7, 4, 0.6, 0, Math.PI * 2); ctx.fill();
+
+      // hull: shaded gradient fill + dark outline
+      var hg = ctx.createLinearGradient(0, -W, 0, W);
+      hg.addColorStop(0, '#bd8550');
+      hg.addColorStop(0.5, '#9c6633');
+      hg.addColorStop(1, '#7d4f27');
+      ctx.fillStyle = hg;
+      ctx.strokeStyle = '#46290f';
+      ctx.lineWidth = 3;
+      hullPath(L, W, 0, 0);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,230,180,0.25)';
-      ctx.fillRect(-CELL * 0.30, -CELL * 0.16, CELL * 0.5, 5);
-      // seated kid (top-down: shirt + head)
+      ctx.stroke();
+
+      // inner deck (lighter wood) + plank seams
+      ctx.fillStyle = '#ceac74';
+      hullPath(L, W, 7, 6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(90, 58, 26, 0.45)';
+      ctx.lineWidth = 1.5;
+      for (var pk = -1; pk <= 1; pk++) {
+        ctx.beginPath();
+        ctx.moveTo(-L * 0.68, pk * (W * 0.42));
+        ctx.lineTo(L * 0.74, pk * (W * 0.42));
+        ctx.stroke();
+      }
+
+      // seat plank (thwart) the kid sits on
+      ctx.fillStyle = '#8a5a2b';
+      ctx.fillRect(-L * 0.20, -W * 0.80, L * 0.20, W * 1.60);
+
+      // seated kid, facing the bow (+x): shirt body, then hair, then face
       ctx.fillStyle = '#43e97b';
-      ctx.beginPath(); ctx.arc(-CELL * 0.02, 0, CELL * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fce8b8';
-      ctx.beginPath(); ctx.arc(-CELL * 0.02, 0, CELL * 0.07, 0, Math.PI * 2); ctx.fill();
+      roundRect(ctx, -L * 0.30, -W * 0.45, L * 0.36, W * 0.90, 6);
+      ctx.fill();
+      ctx.fillStyle = '#e3a86b';                                  // hair
+      ctx.beginPath(); ctx.arc(L * 0.04, 0, W * 0.50, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fce8b8';                                  // face/skin
+      ctx.beginPath(); ctx.arc(L * 0.07, 0, W * 0.38, 0, Math.PI * 2); ctx.fill();
+
       ctx.restore();
     }
 
