@@ -603,17 +603,21 @@
 .gg-hh-banner-info { background: #cfeefe; }
 
 .gg-hh-modal {
-  position: absolute;
+  /* fixed to the VIEWPORT (not the stage) so it's always fully visible even
+     when the edge-to-edge stage is taller than the screen. */
+  position: fixed;
   left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 10;
-  width: min(560px, 92%);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
   background: #ffffff;
   color: #15234a;
   border-radius: 18px;
-  padding: 16px 18px 14px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 18px 18px 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
   animation: gg-fade-in-up 0.25s ease-out both;
 }
 .gg-hh-modal-lead { margin: 0 0 4px; font-size: 0.95em; color: #5b6b8c; }
