@@ -79,30 +79,71 @@ GG.screens.habitHarbor = (function() {
       }
     }
 
-    function drawWall(c, r) {
-      var x = cx(c) + 2, y = cy(r) + 2, w = CELL - 4, h = CELL - 4;
-      var g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, '#7c5734');
-      g.addColorStop(1, '#563c22');
-      ctx.fillStyle = g;
-      roundRect(ctx, x, y, w, h, 7);
-      ctx.fill();
-      // horizontal plank seams
-      ctx.strokeStyle = 'rgba(38, 24, 11, 0.5)';
-      ctx.lineWidth = 1.5;
-      for (var i = 1; i < 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(x + 4, y + (h / 3) * i);
-        ctx.lineTo(x + w - 4, y + (h / 3) * i);
-        ctx.stroke();
+    function isWallCell(c, r) {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true; // canvas border counts as wall
+      return model.grid[r][c] === '#';
+    }
+
+    function strokeLine(x0, y0, x1, y1) {
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+
+    // Render all '#' cells as CONTINUOUS wooden docks: seamless fill + plank
+    // texture, with outlines/shadows drawn ONLY where a dock meets open water.
+    // (No seams between adjacent walls — so it reads as solid piers, not a
+    // grid of blocks.)
+    function drawDocks() {
+      var r, c, x, y;
+      // Pass 1: seamless wood fill (no rounding, no per-cell outline) + faint
+      // deterministic tint variation so large dock areas aren't flat.
+      for (r = 0; r < ROWS; r++) {
+        for (c = 0; c < COLS; c++) {
+          if (model.grid[r][c] !== '#') continue;
+          x = cx(c); y = cy(r);
+          var g = ctx.createLinearGradient(0, y, 0, y + CELL);
+          g.addColorStop(0, '#7c5734');
+          g.addColorStop(1, '#5a3f24');
+          ctx.fillStyle = g;
+          ctx.fillRect(x, y, CELL, CELL);
+          var v = ((c * 5 + r * 3) % 3) * 0.04;
+          if (v > 0) { ctx.fillStyle = 'rgba(0,0,0,' + v + ')'; ctx.fillRect(x, y, CELL, CELL); }
+        }
       }
-      // top plank highlight + crisp outline
-      ctx.fillStyle = 'rgba(255, 226, 172, 0.16)';
-      ctx.fillRect(x + 5, y + 4, w - 10, 4);
-      ctx.strokeStyle = 'rgba(18, 11, 5, 0.5)';
-      ctx.lineWidth = 1.5;
-      roundRect(ctx, x, y, w, h, 7);
-      ctx.stroke();
+      // Pass 2: plank seams + corner nail dots
+      ctx.strokeStyle = 'rgba(40, 26, 12, 0.30)';
+      ctx.lineWidth = 1;
+      for (r = 0; r < ROWS; r++) {
+        for (c = 0; c < COLS; c++) {
+          if (model.grid[r][c] !== '#') continue;
+          x = cx(c); y = cy(r);
+          strokeLine(x, y + CELL * 0.5, x + CELL, y + CELL * 0.5);
+          ctx.fillStyle = 'rgba(28, 17, 7, 0.40)';
+          ctx.fillRect(x + 5, y + 5, 2, 2);
+          ctx.fillRect(x + CELL - 7, y + 5, 2, 2);
+          ctx.fillRect(x + 5, y + CELL - 7, 2, 2);
+          ctx.fillRect(x + CELL - 7, y + CELL - 7, 2, 2);
+        }
+      }
+      // Pass 3: shoreline — soft shadow cast onto the water + sunlit/dark rims,
+      // only on edges adjacent to a non-wall cell.
+      var S = 7, sg;
+      for (r = 0; r < ROWS; r++) {
+        for (c = 0; c < COLS; c++) {
+          if (model.grid[r][c] !== '#') continue;
+          x = cx(c); y = cy(r);
+          var top = !isWallCell(c, r - 1), bot = !isWallCell(c, r + 1),
+              lef = !isWallCell(c - 1, r), rig = !isWallCell(c + 1, r);
+          if (bot) { sg = ctx.createLinearGradient(0, y + CELL, 0, y + CELL + S); sg.addColorStop(0, 'rgba(0,0,0,0.30)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sg; ctx.fillRect(x, y + CELL, CELL, S); }
+          if (rig) { sg = ctx.createLinearGradient(x + CELL, 0, x + CELL + S, 0); sg.addColorStop(0, 'rgba(0,0,0,0.30)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sg; ctx.fillRect(x + CELL, y, S, CELL); }
+          if (top) { sg = ctx.createLinearGradient(0, y, 0, y - S); sg.addColorStop(0, 'rgba(0,0,0,0.22)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sg; ctx.fillRect(x, y - S, CELL, S); }
+          if (lef) { sg = ctx.createLinearGradient(x, 0, x - S, 0); sg.addColorStop(0, 'rgba(0,0,0,0.22)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sg; ctx.fillRect(x - S, y, S, CELL); }
+          ctx.lineWidth = 2;
+          if (top) { ctx.strokeStyle = 'rgba(255,228,170,0.45)'; strokeLine(x, y + 1, x + CELL, y + 1); }
+          if (lef) { ctx.strokeStyle = 'rgba(255,228,170,0.22)'; strokeLine(x + 1, y, x + 1, y + CELL); }
+          if (bot) { ctx.strokeStyle = 'rgba(18,11,5,0.55)';     strokeLine(x, y + CELL - 1, x + CELL, y + CELL - 1); }
+          if (rig) { ctx.strokeStyle = 'rgba(18,11,5,0.45)';     strokeLine(x + CELL - 1, y, x + CELL - 1, y + CELL); }
+        }
+      }
     }
 
     function drawGate(gate) {
@@ -264,11 +305,7 @@ GG.screens.habitHarbor = (function() {
     function drawScene() {
       ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
       drawWater();
-      for (var r = 0; r < ROWS; r++) {
-        for (var c = 0; c < COLS; c++) {
-          if (model.grid[r][c] === '#') drawWall(c, r);
-        }
-      }
+      drawDocks();
       model.gates.forEach(drawGate);
       drawExit();
       model.bots.forEach(drawBot);
