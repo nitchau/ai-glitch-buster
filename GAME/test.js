@@ -152,6 +152,22 @@
     assertTrue(!!model.exit, 'should have an exit');
   });
 
+  // --- Bad-Habit Harbor (Phase 2: movement collision) ---
+
+  test('habitHarborMaze.isWall: border is wall, spawn is open', function() {
+    var m = GG.habitHarborMaze.build();
+    assertTrue(GG.habitHarborMaze.isWall(m, 0, 0, {}), 'border should be wall');
+    assertFalse(GG.habitHarborMaze.isWall(m, m.spawn.c, m.spawn.r, {}), 'spawn should be open');
+  });
+
+  test('habitHarborMaze.isWall: a gate blocks when closed, passes when opened', function() {
+    var m = GG.habitHarborMaze.build();
+    var g = m.gates[0];
+    assertTrue(GG.habitHarborMaze.isWall(m, g.c, g.r, {}), 'closed gate is wall');
+    var open = {}; open[g.id] = true;
+    assertFalse(GG.habitHarborMaze.isWall(m, g.c, g.r, open), 'opened gate is passable');
+  });
+
   function render() {
     var html = '<h1>Glitch Guardians — Test Runner</h1>';
     var passed = 0;

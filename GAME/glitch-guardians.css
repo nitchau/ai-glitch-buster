@@ -524,6 +524,47 @@
 }
 .gg-hh-canvas { display: block; width: 100%; height: auto; }
 
+/* On-screen D-pad (Phase 2) — bottom-right of the stage, big finger-sized
+   buttons that work on touch + mouse. Shares input with the keyboard. */
+.gg-hh-dpad {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 58px);
+  grid-template-rows: repeat(3, 58px);
+  grid-template-areas:
+    ".    up    ."
+    "left .     right"
+    ".    down  .";
+  gap: 6px;
+  z-index: 5;
+  touch-action: none;
+}
+.gg-hh-dbtn {
+  width: 58px;
+  height: 58px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(10, 30, 45, 0.72);
+  color: #cfeefe;
+  font-size: 1.6em;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(120, 220, 230, 0.35);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.gg-hh-dbtn:active { background: rgba(56, 249, 215, 0.45); color: #06141f; }
+.gg-hh-up    { grid-area: up; }
+.gg-hh-left  { grid-area: left; }
+.gg-hh-right { grid-area: right; }
+.gg-hh-down  { grid-area: down; }
+
 /* Overlay holds the question banner and answer-platform labels.
    Positioned exactly over the canvas so labels can be in canvas-coords. */
 .gg-bb-overlay {

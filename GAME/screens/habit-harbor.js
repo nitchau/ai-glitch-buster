@@ -51,10 +51,78 @@ GG.screens.habitHarbor = (function() {
     canvas.height = CANVAS_H;
     stageEl.appendChild(canvas);
 
+    // On-screen D-pad (built before append so it sits inside the stage).
+    // Its buttons feed the SAME `keys` object as the keyboard — one input
+    // model, two surfaces (touch/mouse + keys).
+    var keys = {};
+    var dpad = document.createElement('div');
+    dpad.className = 'gg-hh-dpad';
+    function mkBtn(label, code, cls) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'gg-hh-dbtn ' + cls;
+      b.textContent = label;
+      function on(e) { e.preventDefault(); keys[code] = true; }
+      function off(e) { e.preventDefault(); keys[code] = false; }
+      b.addEventListener('pointerdown', on);
+      b.addEventListener('pointerup', off);
+      b.addEventListener('pointerleave', off);
+      b.addEventListener('pointercancel', off);
+      return b;
+    }
+    dpad.appendChild(mkBtn('▲', 'ArrowUp', 'gg-hh-up'));
+    dpad.appendChild(mkBtn('◄', 'ArrowLeft', 'gg-hh-left'));
+    dpad.appendChild(mkBtn('►', 'ArrowRight', 'gg-hh-right'));
+    dpad.appendChild(mkBtn('▼', 'ArrowDown', 'gg-hh-down'));
+    stageEl.appendChild(dpad);
+
     rootEl.appendChild(stageEl);
 
     var ctx = canvas.getContext('2d');
-    var state = { running: true, t: 0 };
+    var state = {
+      running: true,
+      t: 0,
+      px: model.spawn ? model.spawn.c * CELL + CELL / 2 : CELL,
+      py: model.spawn ? model.spawn.r * CELL + CELL / 2 : CELL,
+      angle: 0,          // bow faces +x
+      openGates: {}      // Phase 3 will populate this on each rescue
+    };
+
+    // Keyboard input (arrows + WASD) feeds the same `keys` object as the D-pad.
+    function onKeyDown(e) {
+      keys[e.code] = true;
+      if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS'].indexOf(e.code) >= 0) {
+        e.preventDefault();
+      }
+    }
+    function onKeyUp(e) { keys[e.code] = false; }
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    // ---- movement + per-axis wall collision (uses the maze's isWall) ----
+    var BOAT_SPEED = 3, BOAT_R = CELL * 0.30;   // radius < half-corridor so it fits 1-cell channels
+    function hitsWall(px, py) {
+      var c0 = Math.floor((px - BOAT_R) / CELL), c1 = Math.floor((px + BOAT_R) / CELL);
+      var r0 = Math.floor((py - BOAT_R) / CELL), r1 = Math.floor((py + BOAT_R) / CELL);
+      for (var rr = r0; rr <= r1; rr++) {
+        for (var cc = c0; cc <= c1; cc++) {
+          if (maze.isWall(model, cc, rr, state.openGates)) return true;
+        }
+      }
+      return false;
+    }
+    function updateBoat() {
+      var goL = keys.ArrowLeft || keys.KeyA, goR = keys.ArrowRight || keys.KeyD,
+          goU = keys.ArrowUp || keys.KeyW,   goD = keys.ArrowDown || keys.KeyS;
+      var dx = (goR ? 1 : 0) - (goL ? 1 : 0), dy = (goD ? 1 : 0) - (goU ? 1 : 0);
+      // resolve axes separately so the boat slides along walls instead of sticking
+      if (dx) { var nx = state.px + dx * BOAT_SPEED; if (!hitsWall(nx, state.py)) state.px = nx; }
+      if (dy) { var ny = state.py + dy * BOAT_SPEED; if (!hitsWall(state.px, ny)) state.py = ny; }
+      if (dx > 0) state.angle = 0;
+      else if (dx < 0) state.angle = Math.PI;
+      else if (dy > 0) state.angle = Math.PI / 2;
+      else if (dy < 0) state.angle = -Math.PI / 2;
+    }
 
     // ---- drawing helpers (top-down) ----
     function cx(c) { return c * CELL; }
@@ -235,13 +303,12 @@ GG.screens.habitHarbor = (function() {
     }
 
     function drawBoat() {
-      if (!model.spawn) return;
-      var x = cx(model.spawn.c), y = cy(model.spawn.r);
       var bob = Math.sin(state.t * 0.06) * 1.5;
-      var L = CELL * 0.58;   // half length (bow points +x, into the maze)
+      var L = CELL * 0.58;   // half length (bow points +x at angle 0)
       var W = CELL * 0.30;   // half width
       ctx.save();
-      ctx.translate(x + CELL / 2, y + CELL / 2 + bob);
+      ctx.translate(state.px, state.py + bob);
+      ctx.rotate(state.angle);
 
       // wake foam trailing off the stern
       ctx.fillStyle = 'rgba(220, 245, 255, 0.16)';
@@ -315,12 +382,15 @@ GG.screens.habitHarbor = (function() {
     function tick() {
       if (!state.running) return;
       state.t++;
+      updateBoat();
       drawScene();
       requestAnimationFrame(tick);
     }
 
     function cleanup() {
       state.running = false;
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
       var gr = document.getElementById('gg-root');
       if (gr) gr.classList.remove('gg-hh-active');
       try { localStorage.removeItem('gg.activeIsland'); } catch (e) {}
