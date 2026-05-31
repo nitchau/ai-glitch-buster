@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm -F bias-breaker build",
+  "outputDirectory": "games/bias-breaker/dist",
+  "rewrites": [
+    { "source": "/bias-breaker/(.*)", "destination": "/$1" },
+    { "source": "/bias-breaker", "destination": "/" }
+  ]
+}

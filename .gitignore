@@ -1,0 +1,8 @@
+
+# Monorepo additions (Phase 1)
+node_modules/
+dist/
+coverage/
+playwright-report/
+.vercel/
+*.log

@@ -1,0 +1,9 @@
+dist/
+node_modules/
+legacy/
+.vercel/
+coverage/
+playwright-report/
+pnpm-lock.yaml
+*.html
+*.md
