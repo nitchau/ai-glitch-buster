@@ -324,7 +324,7 @@ if (__TEST_SEAM__) {
 
 Organized into **5 milestones**. Each milestone is independently playable / testable; sessions can pause between them.
 
-### Milestone A — Static world + player movement
+### Milestone A — Static world + player movement  ✅ DONE (commit `1b5f443`, Session 1)
 
 **A1: Constants module**
 - **ACTION**: Create `games/bias-breaker/src/constants.ts` with every v13.3 constant.
@@ -364,7 +364,7 @@ Organized into **5 milestones**. Each milestone is independently playable / test
 
 ---
 
-### Milestone B — Question flow (flyers, dwell, carrier, banner)
+### Milestone B — Question flow (flyers, dwell, carrier, banner)  ✅ DONE (commit `1b5f443`, Session 1)
 
 **B1: Flyer entity + drift animation**
 - **ACTION**: Create `entities/Flyer.ts`.
