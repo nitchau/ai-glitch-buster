@@ -8,6 +8,6 @@ export class PreloadScene extends Phaser.Scene {
     super('PreloadScene');
   }
   create(): void {
-    this.scene.start('GameScene');
+    this.scene.start('AvatarSelectScene');
   }
 }
