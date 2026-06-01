@@ -10,6 +10,7 @@ export class Flyer {
   readonly data: FlyerData;
   readonly sprite: Phaser.Physics.Arcade.Image;
   readonly label: Phaser.GameObjects.Text;
+  private carrySwing = 0; // 0 = on top, 1 = fully hanging below (hang carry only)
 
   constructor(scene: Phaser.Scene, data: FlyerData) {
     this.data = data;
@@ -56,9 +57,11 @@ export class Flyer {
   // Carrier transit toward the next platform. Returns true when arrived.
   // INCLUDES the v13.3 snap-when-close fix (otherwise the lerp tail makes
   // the player visibly hang in the air for ~1.3s).
-  updateCarrier(player: Phaser.Physics.Arcade.Sprite, nextSolid: Solid): boolean {
+  updateCarrier(player: Phaser.Physics.Arcade.Sprite, nextSolid: Solid, hang = false): boolean {
     const targetX = nextSolid.x + 30;
-    const targetY = nextSolid.y;
+    // When hanging (kite / quadcopter) the flyer rides higher so the player
+    // dangling underneath lands with their feet on the platform surface.
+    const targetY = hang ? nextSolid.y - PLAYER_H - this.data.h : nextSolid.y;
     const remX = targetX - this.data.x;
     const remY = targetY - this.data.y;
     const dist = Math.hypot(remX, remY);
@@ -75,11 +78,20 @@ export class Flyer {
     this.sprite.setPosition(this.data.x, this.data.y);
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
 
-    // Lock player to flyer during transit
+    // Lock player to flyer during transit.
     const playerBody = player.body as Phaser.Physics.Arcade.Body;
     playerBody.setAllowGravity(false);
     player.setVelocity(0, 0);
-    player.setPosition(this.data.x + this.data.w / 2, this.data.y);
+    if (hang) {
+      // Swing smoothly from on-top to hanging-below over the first frames.
+      this.carrySwing = Math.min(1, this.carrySwing + 0.1);
+      const topFeet = this.data.y;
+      const hangFeet = this.data.y + this.data.h + PLAYER_H;
+      const feet = topFeet + (hangFeet - topFeet) * this.carrySwing;
+      player.setPosition(this.data.x + this.data.w / 2, feet);
+    } else {
+      player.setPosition(this.data.x + this.data.w / 2, this.data.y);
+    }
 
     // Arrival
     const arrived = Math.abs(this.data.x - targetX) < 4 && Math.abs(this.data.y - targetY) < 4;

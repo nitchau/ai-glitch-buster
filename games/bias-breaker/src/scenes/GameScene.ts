@@ -48,6 +48,7 @@ type GameState = {
   respawning: boolean; // true during the lava fade-out → respawn → fade-in
   tortoiseSpawnFrame: number; // animFrame at which the next tortoise may appear
   lastSecond: number; // last whole second pushed to the HUD timer
+  carryHang: boolean; // current carry rides UNDER the flyer (kite / quadcopter)
 };
 
 export class GameScene extends Phaser.Scene {
@@ -188,6 +189,7 @@ export class GameScene extends Phaser.Scene {
       respawning: false,
       tortoiseSpawnFrame: TORTOISE_FIRST_DELAY,
       lastSecond: 0,
+      carryHang: false,
     };
 
     // ---- Flyers + banner + HUD + dwell ring ----
@@ -263,7 +265,11 @@ export class GameScene extends Phaser.Scene {
       this.dwellRing.clear();
       const nextSolid =
         this.level.sections[this.state.currentSection + 1]?.solid ?? this.level.finalSolid;
-      const arrived = this.state.carryingFlyer.updateCarrier(this.player.sprite, nextSolid);
+      const arrived = this.state.carryingFlyer.updateCarrier(
+        this.player.sprite,
+        nextSolid,
+        this.state.carryHang
+      );
       if (arrived) {
         this.arriveAtNextSection();
       }
@@ -308,8 +314,14 @@ export class GameScene extends Phaser.Scene {
       const vy = Math.abs(playerBody.velocity.y);
       const stillEnough = vx < WALK_SPEED_PER_S * 0.5 && vy < 40;
       if (stillEnough) {
-        // Ride the drifting cloud so standing still keeps the player aboard.
-        this.player.sprite.setVelocityX(this.state.onFlyer.data.vx * 60);
+        // Ride the drifting flyer so standing still keeps the player aboard.
+        // The flyer drifts vx px PER UPDATE (driven by animFrame), so to track it
+        // the player must move vx px per update too — velocity integrates over
+        // real time, hence vx * 1000 / delta (frame-rate independent). Using a
+        // flat vx * 60 let the player slide off narrow kites when fps dipped.
+        const rideVx =
+          delta > 0 ? (this.state.onFlyer.data.vx * 1000) / delta : this.state.onFlyer.data.vx * 60;
+        this.player.sprite.setVelocityX(rideVx);
         this.state.dwellTicks++;
         if (this.state.dwellTicks >= COMMIT_FRAMES) {
           this.commitAnswer(this.state.onFlyer);
@@ -502,7 +514,9 @@ export class GameScene extends Phaser.Scene {
       sec.answered = true;
       flyer.data.carrying = true;
       this.state.carryingFlyer = flyer;
-      this.banner.show('Correct! Hold on...', 'correct');
+      // Kite & quadcopter carry you hanging underneath; the rest ride on top.
+      this.state.carryHang = flyer.data.type === 'kite' || flyer.data.type === 'quadcopter';
+      this.banner.show(this.state.carryHang ? 'Correct! Hang on!' : 'Correct! Hold on...', 'correct');
       for (const f of this.flyers) {
         if (f !== flyer && f.data.state === 'live') {
           f.data.state = 'crashing';
