@@ -22,6 +22,8 @@ import {
   TORTOISE_RESPAWN_MIN,
   TORTOISE_RESPAWN_MAX,
   TORTOISE_STOMP_POINTS,
+  STAR_TIME_GOLD,
+  STAR_TIME_SILVER,
 } from '../constants';
 import { buildLevel, buildFlyers } from '../level/buildLevel';
 import type { Level, Section } from '../level/types';
@@ -56,6 +58,7 @@ export class GameScene extends Phaser.Scene {
   private banner!: Banner;
   private hud!: Hud;
   private tortoise: Tortoise | null = null;
+  private doorRect!: Phaser.GameObjects.Rectangle;
   private state!: GameState;
 
   constructor() {
@@ -114,7 +117,7 @@ export class GameScene extends Phaser.Scene {
       )
       .setOrigin(0, 0)
       .setStrokeStyle(3, 0x4a2f15);
-    this.add
+    this.doorRect = this.add
       .rectangle(
         this.level.door.x,
         this.level.door.y,
@@ -275,6 +278,9 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.state.dwellTicks = 0;
     }
+
+    // Final platform — open the door and watch for the player walking through.
+    this.checkDoor();
   }
 
   // ---- Lava + respawn (Milestone C1) ----
@@ -397,6 +403,57 @@ export class GameScene extends Phaser.Scene {
       const tCenter = t.x + TORTOISE_W / 2;
       this.player.sprite.setVelocityX(px < tCenter ? -240 : 240);
     }
+  }
+
+  // ---- Final door + win (Milestone D1) ----
+
+  private checkDoor(): void {
+    if (this.state.doorEntered) return;
+    if (this.state.currentSection < this.level.sections.length) return;
+
+    // All sections answered — open the door once and prompt.
+    if (!this.level.door.open) {
+      this.level.door.open = true;
+      this.doorRect.setFillStyle(0x6effc0);
+      this.banner.show('The door is open — walk through! 🚪', 'info');
+    }
+
+    const d = this.level.door;
+    const px = this.player.sprite.x;
+    const pBottom = this.player.sprite.y; // feet
+    const pTop = pBottom - PLAYER_H;
+    const overlap =
+      px + PLAYER_W / 2 > d.x + 10 &&
+      px - PLAYER_W / 2 < d.x + d.w - 10 &&
+      pBottom > d.y + 20 &&
+      pTop < d.y + d.h - 20;
+    if (overlap) this.enterDoor();
+  }
+
+  private enterDoor(): void {
+    this.state.doorEntered = true;
+    if (this.tortoise) {
+      this.tortoise.destroy();
+      this.tortoise = null;
+    }
+    this.banner.show('You walked through! 🎉', 'correct');
+    // Fade + shrink the avatar, then hand off to the celebration (legacy 870-888).
+    this.tweens.add({
+      targets: this.player.sprite,
+      alpha: 0,
+      scaleX: 0.4,
+      scaleY: 0.4,
+      duration: 500,
+    });
+    this.time.delayedCall(900, () => {
+      const finalSec = Math.floor(this.state.timeMs / 1000);
+      const stars = finalSec <= STAR_TIME_GOLD ? 3 : finalSec <= STAR_TIME_SILVER ? 2 : 1;
+      this.scene.start('CelebrationScene', {
+        stars,
+        time: finalSec,
+        score: this.state.score,
+      });
+    });
   }
 
   private commitAnswer(flyer: Flyer): void {
