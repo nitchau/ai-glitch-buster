@@ -405,7 +405,7 @@ Organized into **5 milestones**. Each milestone is independently playable / test
 
 ---
 
-### Milestone C — Hazards (lava + tortoise) + respawn
+### Milestone C — Hazards (lava + tortoise) + respawn  ✅ DONE (commit `e788ee2`, Session 2)
 
 **C1: Lava fall + respawn**
 - **ACTION**: When player crosses LAVA_Y while airborne, fade to black, respawn at current section, reset section flyers.
@@ -432,7 +432,7 @@ Organized into **5 milestones**. Each milestone is independently playable / test
 
 ---
 
-### Milestone D — Win + Celebration + Profile
+### Milestone D — Win + Celebration + Profile  ✅ DONE (commit `10494b6`, Session 2)
 
 **D1: Final door + win detection**
 - **ACTION**: When all 5 sections answered, open the door; on player-door overlap, trigger win.
