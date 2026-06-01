@@ -135,6 +135,7 @@ function ensureFlyerTexture(
   if (scene.textures.exists(key)) return;
   const g = scene.add.graphics({ x: 0, y: 0 });
   const tint = Phaser.Display.Color.HexStringToColor(color).color;
+  const DARK = 0x12233f;
   if (type === 'cloud') {
     g.fillStyle(0xffffff);
     g.fillCircle(w * 0.25, h * 0.55, h * 0.4);
@@ -144,31 +145,101 @@ function ensureFlyerTexture(
     g.fillStyle(tint, 0.4);
     g.fillRect(0, h * 0.7, w, h * 0.2);
   } else if (type === 'bird') {
+    // Seagull silhouette: two wings up (an "M"), a body, head + beak.
     g.fillStyle(tint);
-    g.fillEllipse(w / 2, h / 2, w, h * 0.6);
-    g.fillTriangle(w * 0.1, h * 0.3, w * 0.3, h * 0.5, w * 0.1, h * 0.7);
-    g.fillTriangle(w * 0.9, h * 0.3, w * 0.7, h * 0.5, w * 0.9, h * 0.7);
+    g.fillTriangle(w * 0.5, h * 0.74, w * 0.03, h * 0.1, w * 0.44, h * 0.5);
+    g.fillTriangle(w * 0.5, h * 0.74, w * 0.97, h * 0.1, w * 0.56, h * 0.5);
+    g.fillEllipse(w * 0.5, h * 0.6, w * 0.2, h * 0.55);
+    g.fillCircle(w * 0.5, h * 0.4, h * 0.16);
+    g.fillStyle(0xffb000); // beak
+    g.fillTriangle(w * 0.5, h * 0.24, w * 0.45, h * 0.4, w * 0.55, h * 0.4);
+    g.fillStyle(DARK); // eyes
+    g.fillCircle(w * 0.46, h * 0.4, 1.8);
+    g.fillCircle(w * 0.54, h * 0.4, 1.8);
   } else if (type === 'kite') {
+    // Diamond with cross-struts and a little bow tail.
+    const kb = h * 0.7;
     g.fillStyle(tint);
     g.beginPath();
-    g.moveTo(w / 2, 0);
-    g.lineTo(w, h / 2);
-    g.lineTo(w / 2, h);
-    g.lineTo(0, h / 2);
+    g.moveTo(w * 0.5, 0);
+    g.lineTo(w * 0.88, kb * 0.45);
+    g.lineTo(w * 0.5, kb);
+    g.lineTo(w * 0.12, kb * 0.45);
     g.closePath();
     g.fillPath();
+    g.lineStyle(2, 0xffffff, 0.6);
+    g.beginPath();
+    g.moveTo(w * 0.5, 0);
+    g.lineTo(w * 0.5, kb);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(w * 0.12, kb * 0.45);
+    g.lineTo(w * 0.88, kb * 0.45);
+    g.strokePath();
+    g.lineStyle(2, 0xffffff, 0.8); // tail
+    g.beginPath();
+    g.moveTo(w * 0.5, kb);
+    g.lineTo(w * 0.42, h * 0.86);
+    g.lineTo(w * 0.58, h);
+    g.strokePath();
+    g.fillStyle(0xff6b9d); // tail bows
+    g.fillTriangle(w * 0.47, kb + 3, w * 0.4, kb - 1, w * 0.4, kb + 7);
+    g.fillTriangle(w * 0.5, kb + 6, w * 0.57, kb + 2, w * 0.57, kb + 10);
   } else if (type === 'helicopter') {
+    g.fillStyle(tint); // main rotor (top)
+    g.fillRect(w * 0.08, 2, w * 0.84, 5);
+    g.fillStyle(DARK);
+    g.fillRect(w * 0.5, 6, 4, h * 0.22); // mast
     g.fillStyle(tint);
-    g.fillRoundedRect(w * 0.15, h * 0.3, w * 0.7, h * 0.5, 10);
-    g.fillStyle(0x444444);
-    g.fillRect(0, h * 0.1, w, 4);
+    g.fillRect(w * 0.1, h * 0.46, w * 0.42, h * 0.13); // tail boom
+    g.fillTriangle(w * 0.12, h * 0.32, w * 0.12, h * 0.62, w * 0.02, h * 0.47); // tail fin
+    g.fillStyle(DARK);
+    g.fillRect(w * 0.04, h * 0.28, 3, h * 0.42); // tail rotor
+    g.fillStyle(tint);
+    g.fillEllipse(w * 0.64, h * 0.56, w * 0.46, h * 0.62); // cabin
+    g.fillStyle(0xbfe9ff); // cockpit window
+    g.fillEllipse(w * 0.76, h * 0.52, w * 0.16, h * 0.34);
+    g.lineStyle(3, DARK, 1); // skids
+    g.beginPath();
+    g.moveTo(w * 0.46, h * 0.96);
+    g.lineTo(w * 0.82, h * 0.96);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(w * 0.56, h * 0.84);
+    g.lineTo(w * 0.56, h * 0.96);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(w * 0.72, h * 0.84);
+    g.lineTo(w * 0.72, h * 0.96);
+    g.strokePath();
   } else if (type === 'quadcopter') {
-    g.fillStyle(tint);
-    g.fillRect(w * 0.4, h * 0.4, w * 0.2, h * 0.2);
-    g.fillCircle(w * 0.1, h * 0.2, 8);
-    g.fillCircle(w * 0.9, h * 0.2, 8);
-    g.fillCircle(w * 0.1, h * 0.8, 8);
-    g.fillCircle(w * 0.9, h * 0.8, 8);
+    g.lineStyle(4, DARK, 1); // X arms
+    const arms: ReadonlyArray<readonly [number, number]> = [
+      [0.13, 0.26],
+      [0.87, 0.26],
+      [0.13, 0.86],
+      [0.87, 0.86],
+    ];
+    for (const [ex, ey] of arms) {
+      g.beginPath();
+      g.moveTo(w * 0.5, h * 0.55);
+      g.lineTo(w * ex, h * ey);
+      g.strokePath();
+    }
+    g.fillStyle(tint, 0.5); // spinning rotor discs
+    g.fillEllipse(w * 0.13, h * 0.26, w * 0.24, h * 0.32);
+    g.fillEllipse(w * 0.87, h * 0.26, w * 0.24, h * 0.32);
+    g.fillEllipse(w * 0.13, h * 0.86, w * 0.24, h * 0.32);
+    g.fillEllipse(w * 0.87, h * 0.86, w * 0.24, h * 0.32);
+    g.fillStyle(DARK); // hubs
+    g.fillCircle(w * 0.13, h * 0.26, 3);
+    g.fillCircle(w * 0.87, h * 0.26, 3);
+    g.fillCircle(w * 0.13, h * 0.86, 3);
+    g.fillCircle(w * 0.87, h * 0.86, 3);
+    g.fillStyle(tint); // body
+    g.fillRoundedRect(w * 0.4, h * 0.34, w * 0.2, h * 0.46, 5);
+    g.fillStyle(DARK); // camera
+    g.fillCircle(w * 0.5, h * 0.82, 3.5);
   }
   g.generateTexture(key, w, h);
   g.destroy();
