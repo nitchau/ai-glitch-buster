@@ -32,15 +32,20 @@ export const SOLID_H = 30;
 export const SECTION_SPACING = 770;
 
 // Flyers
-export const FLYER_DRIFT_SPEED = 0.008;
+// Drift advances on the per-FRAME clock (animFrame), matching the vanilla rAF
+// loop. (An earlier port keyed this off elapsed seconds, which ran ~60x too
+// slow — clouds crawled.) Slightly brisker than the legacy 0.008 so a reachable
+// cloud comes around without a long wait.
+export const FLYER_DRIFT_SPEED = 0.012;
 export const FLYER_Y_TOP = 240;
 export const FLYER_Y_STEP = 90;
 export const FLYER_TYPES = ['cloud', 'bird', 'kite', 'helicopter', 'quadcopter'] as const;
 export type FlyerType = (typeof FLYER_TYPES)[number];
 export const ANSWER_COLORS = ['#43e97b', '#f5576c', '#ffd166', '#8b5cf6'] as const;
 
-// Dwell-to-confirm (frames at 60fps)
-export const COMMIT_FRAMES = 90;   // 1.5s
+// Dwell-to-confirm (frames at 60fps). The circular ring above the player fills
+// over this many frames while they stand still on an answer cloud.
+export const COMMIT_FRAMES = 120;  // 2s
 export const CRASH_FRAMES = 120;   // 2s anti-camp
 
 // Lava

@@ -1,8 +1,9 @@
 // GameScene — the playable Bias Breaker level.
-// Milestone A: static world (platforms, lava, doors, background) + player + camera + keyboard.
-// Milestone B: drifting answer flyers + question banner + dwell-to-confirm + carrier-flyer transit.
-// Milestone C: lava fall + v13.2 NaN-free respawn, tortoise enemy (walk/stomp/bump), HUD.
-// Milestone D (next): final door win flow → CelebrationScene + markIslandCleared.
+// A: static world + player + camera + keyboard.  B: flyers + dwell + carrier.
+// C: lava respawn + tortoise + HUD.              D: door win → Celebration.
+// Polish pass: frame-based cloud drift (+ ride-the-cloud), a circular dwell
+// ring, wrong-answer rain that drops the player into the lava, and the player
+// emerging from the entry door behind an invisible left wall.
 
 import Phaser from 'phaser';
 import { pickN, type Question } from '@gg/shared';
@@ -43,7 +44,7 @@ type GameState = {
   timeMs: number;
   score: number;
   doorEntered: boolean;
-  animFrame: number; // per-frame clock for tortoise scheduling (mirrors legacy animTime)
+  animFrame: number; // per-frame clock for drift + tortoise scheduling
   respawning: boolean; // true during the lava fade-out → respawn → fade-in
   tortoiseSpawnFrame: number; // animFrame at which the next tortoise may appear
   lastSecond: number; // last whole second pushed to the HUD timer
@@ -59,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: Hud;
   private tortoise: Tortoise | null = null;
   private doorRect!: Phaser.GameObjects.Rectangle;
+  private dwellRing!: Phaser.GameObjects.Graphics;
   private state!: GameState;
 
   constructor() {
@@ -66,7 +68,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Persist that we are inside Bias Breaker for refresh-resume (Phase 4 will wire the resume).
+    // Persist that we are inside Bias Breaker for refresh-resume (Phase 4 wires the resume).
     try {
       localStorage.setItem('gg.activeIsland', 'bias-breaker');
     } catch {
@@ -77,7 +79,7 @@ export class GameScene extends Phaser.Scene {
     const questions: Question[] = pickN('bias', 5);
     this.level = buildLevel(questions);
 
-    // World bounds match the full level width so the camera can scroll.
+    // World + camera bounds span the full level width.
     this.physics.world.setBounds(0, 0, this.level.totalWidth, CANVAS_H);
     this.cameras.main.setBounds(0, 0, this.level.totalWidth, CANVAS_H);
 
@@ -106,7 +108,7 @@ export class GameScene extends Phaser.Scene {
       true
     );
 
-    // ---- Entry & final doors (visual placeholders for Milestones A/B) ----
+    // ---- Entry door (where the player emerges) + final door ----
     this.add
       .rectangle(
         this.level.entryDoor.x,
@@ -116,7 +118,17 @@ export class GameScene extends Phaser.Scene {
         0x8b5a2b
       )
       .setOrigin(0, 0)
-      .setStrokeStyle(3, 0x4a2f15);
+      .setStrokeStyle(4, 0x4a2f15);
+    // Door opening (darker inset) for a bit of depth.
+    this.add
+      .rectangle(
+        this.level.entryDoor.x + 12,
+        this.level.entryDoor.y + 14,
+        this.level.entryDoor.w - 24,
+        this.level.entryDoor.h - 14,
+        0x1a1006
+      )
+      .setOrigin(0, 0);
     this.doorRect = this.add
       .rectangle(
         this.level.door.x,
@@ -128,11 +140,26 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setStrokeStyle(3, 0xb38600);
 
-    // ---- Player ----
-    const spawnX = this.level.sections[0]!.solid.x + 160;
-    const spawnY = this.level.sections[0]!.solid.y;
-    this.player = new Player(this, spawnX, spawnY);
+    // ---- Player emerges from the entry door ----
+    const entry = this.level.entryDoor;
+    const firstSolid = this.level.sections[0]!.solid;
+    this.player = new Player(this, entry.x + entry.w / 2, firstSolid.y);
     this.physics.add.collider(this.player.sprite, this.platforms);
+    // Pop out of the doorway.
+    this.player.sprite.setAlpha(0).setScale(0.5);
+    this.tweens.add({
+      targets: this.player.sprite,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 450,
+      ease: 'Back.out',
+    });
+    // Invisible left wall: can't walk off the entry ramp into the lava, and
+    // can't go back out through the door.
+    const leftWall = this.add.rectangle(firstSolid.x - 12, CANVAS_H / 2, 24, CANVAS_H, 0x000000, 0);
+    this.physics.add.existing(leftWall, true);
+    this.physics.add.collider(this.player.sprite, leftWall);
 
     // Keyboard
     this.keys = this.input.keyboard!.addKeys({
@@ -163,11 +190,12 @@ export class GameScene extends Phaser.Scene {
       lastSecond: 0,
     };
 
-    // ---- Flyers for section 0 + banner + HUD ----
+    // ---- Flyers + banner + HUD + dwell ring ----
     this.banner = new Banner(this);
     this.spawnFlyersForSection(0);
     this.banner.show(this.level.sections[0]!.question.question, 'question');
     this.hud = new Hud(this, this.level.sections.length);
+    this.dwellRing = this.add.graphics().setDepth(70);
 
     // ---- Test seam: expose state for Playwright assertions ----
     if (__TEST_SEAM__) {
@@ -175,6 +203,7 @@ export class GameScene extends Phaser.Scene {
         section: this.state.currentSection,
         timeMs: this.state.timeMs,
         score: this.state.score,
+        dwellTicks: this.state.dwellTicks,
         onFlyer: this.state.onFlyer != null,
         carryingFlyer: this.state.carryingFlyer != null,
         doorEntered: this.state.doorEntered,
@@ -208,8 +237,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.state.doorEntered) return;
-    if (this.state.respawning) return; // frozen during the lava fade
+    if (this.state.doorEntered) {
+      this.dwellRing.clear();
+      return;
+    }
+    if (this.state.respawning) {
+      this.dwellRing.clear();
+      return; // frozen during the lava fade
+    }
 
     this.state.animFrame++;
 
@@ -225,6 +260,7 @@ export class GameScene extends Phaser.Scene {
 
     // Carrier transit takes priority — player is locked to the flyer
     if (this.state.carryingFlyer) {
+      this.dwellRing.clear();
       const nextSolid =
         this.level.sections[this.state.currentSection + 1]?.solid ?? this.level.finalSolid;
       const arrived = this.state.carryingFlyer.updateCarrier(this.player.sprite, nextSolid);
@@ -234,16 +270,19 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Normal play: player update + flyers drift
+    // Normal play: player update + flyers drift (frame-based, matches vanilla speed)
     this.player.update(this.keys);
     for (const f of this.flyers) {
-      if (f.data.state === 'live') f.updateDrift(this.state.timeMs);
+      if (f.data.state === 'live') f.updateDrift(this.state.animFrame);
       else if (f.data.state === 'crashing') f.updateCrashing();
     }
 
     // Hazards: lava first (may start a respawn fade), then the tortoise.
     this.checkLava();
-    if (this.state.respawning) return;
+    if (this.state.respawning) {
+      this.dwellRing.clear();
+      return;
+    }
     this.updateTortoise();
     this.checkTortoiseCollision();
 
@@ -255,35 +294,39 @@ export class GameScene extends Phaser.Scene {
       if (f.data.state !== 'live') continue;
       const overlapX =
         this.player.sprite.x + 10 > f.data.x && this.player.sprite.x - 10 < f.data.x + f.data.w;
-      const closeY = Math.abs(playerBottom - f.data.y) < 8;
+      const closeY = Math.abs(playerBottom - f.data.y) < 10;
       if (overlapX && closeY && playerBody.velocity.y >= 0) {
         this.state.onFlyer = f;
         break;
       }
     }
 
-    // Dwell-to-confirm (mirrors legacy 544-565)
+    // Dwell-to-confirm + ride the cloud. The ring fills only while the player is
+    // still ON an answer; jumping or moving off resets it (legacy 544-565).
     if (this.state.onFlyer) {
       const vx = Math.abs(playerBody.velocity.x);
       const vy = Math.abs(playerBody.velocity.y);
-      const stillEnough = vx < WALK_SPEED_PER_S * 0.5 && vy < 30;
+      const stillEnough = vx < WALK_SPEED_PER_S * 0.5 && vy < 40;
       if (stillEnough) {
+        // Ride the drifting cloud so standing still keeps the player aboard.
+        this.player.sprite.setVelocityX(this.state.onFlyer.data.vx * 60);
         this.state.dwellTicks++;
         if (this.state.dwellTicks >= COMMIT_FRAMES) {
           this.commitAnswer(this.state.onFlyer);
         }
       } else {
-        this.state.dwellTicks = Math.max(0, this.state.dwellTicks - 2);
+        this.state.dwellTicks = 0;
       }
     } else {
       this.state.dwellTicks = 0;
     }
+    this.drawDwellRing();
 
     // Final platform — open the door and watch for the player walking through.
     this.checkDoor();
   }
 
-  // ---- Lava + respawn (Milestone C1) ----
+  // ---- Lava + respawn ----
 
   private checkLava(): void {
     if (this.state.respawning || this.state.doorEntered || this.state.carryingFlyer) return;
@@ -314,8 +357,7 @@ export class GameScene extends Phaser.Scene {
     this.state.onFlyer = null;
     this.state.carryingFlyer = null;
 
-    // Clear the tortoise and grant full breathing room before the next spawn
-    // (the v13.2 fix: without this the player can respawn straight onto a bump).
+    // Clear the tortoise and grant full breathing room before the next spawn.
     if (this.tortoise) {
       this.tortoise.destroy();
       this.tortoise = null;
@@ -331,7 +373,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  // ---- Tortoise (Milestone C2) ----
+  // ---- Tortoise ----
 
   private updateTortoise(): void {
     if (this.state.carryingFlyer || this.state.doorEntered) return;
@@ -343,7 +385,6 @@ export class GameScene extends Phaser.Scene {
     const t = this.tortoise;
     if (!t) return;
 
-    // Despawn if the section advanced under it.
     if (t.sectionIdx !== this.state.currentSection) {
       t.destroy();
       this.tortoise = null;
@@ -367,7 +408,6 @@ export class GameScene extends Phaser.Scene {
     const y = SOLID_Y - TORTOISE_H;
     const vx = goingRight ? TORTOISE_SPEED : -TORTOISE_SPEED;
     this.tortoise = new Tortoise(this, this.state.currentSection, x, y, vx);
-    // Schedule the next spawn now (legacy line 711).
     this.state.tortoiseSpawnFrame =
       this.state.animFrame +
       TORTOISE_RESPAWN_MIN +
@@ -377,8 +417,8 @@ export class GameScene extends Phaser.Scene {
   private checkTortoiseCollision(): void {
     const t = this.tortoise;
     if (!t || !t.alive) return;
-    const px = this.player.sprite.x; // feet-origin → center x
-    const pBottom = this.player.sprite.y; // feet
+    const px = this.player.sprite.x;
+    const pBottom = this.player.sprite.y;
     const pLeft = px - PLAYER_W / 2;
     const pRight = px + PLAYER_W / 2;
     const pTop = pBottom - PLAYER_H;
@@ -388,7 +428,7 @@ export class GameScene extends Phaser.Scene {
 
     const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
     if (body.velocity.y > 0 && pBottom < t.y + 22) {
-      // Stomp from above: +20, kill, bounce off (legacy 758-769).
+      // Stomp from above: +20, kill, bounce off.
       t.kill(this.state.animFrame);
       this.state.score += TORTOISE_STOMP_POINTS;
       this.hud.setScore(this.state.score);
@@ -399,19 +439,18 @@ export class GameScene extends Phaser.Scene {
         if (cur && !this.state.doorEntered) this.banner.show(cur.question.question, 'question');
       });
     } else {
-      // Side bump: gentle knockback, no score penalty (legacy 770-775).
+      // Side bump: gentle knockback, no score penalty.
       const tCenter = t.x + TORTOISE_W / 2;
       this.player.sprite.setVelocityX(px < tCenter ? -240 : 240);
     }
   }
 
-  // ---- Final door + win (Milestone D1) ----
+  // ---- Final door + win ----
 
   private checkDoor(): void {
     if (this.state.doorEntered) return;
     if (this.state.currentSection < this.level.sections.length) return;
 
-    // All sections answered — open the door once and prompt.
     if (!this.level.door.open) {
       this.level.door.open = true;
       this.doorRect.setFillStyle(0x6effc0);
@@ -432,12 +471,12 @@ export class GameScene extends Phaser.Scene {
 
   private enterDoor(): void {
     this.state.doorEntered = true;
+    this.dwellRing.clear();
     if (this.tortoise) {
       this.tortoise.destroy();
       this.tortoise = null;
     }
     this.banner.show('You walked through! 🎉', 'correct');
-    // Fade + shrink the avatar, then hand off to the celebration (legacy 870-888).
     this.tweens.add({
       targets: this.player.sprite,
       alpha: 0,
@@ -470,14 +509,56 @@ export class GameScene extends Phaser.Scene {
         }
       }
     } else {
-      this.crashFlyer(flyer, 'Wrong - try again!');
+      this.crashFlyer(flyer, 'Wrong — into the lava you go!');
     }
   }
 
+  // Wrong answer: the chosen cloud bursts into rain and EVERY cloud stops
+  // holding the player up, so they drop straight into the lava (then respawn).
   private crashFlyer(flyer: Flyer, msg: string): void {
     flyer.data.state = 'crashing';
+    this.spawnRain(flyer.data.x + flyer.data.w / 2, flyer.data.y + flyer.data.h / 2);
+    for (const f of this.flyers) {
+      const b = f.sprite.body as Phaser.Physics.Arcade.Body | null;
+      if (b) b.enable = false;
+    }
     this.banner.show(msg, 'wrong');
     this.state.dwellTicks = 0;
+  }
+
+  private spawnRain(x: number, y: number): void {
+    for (let i = 0; i < 16; i++) {
+      const dx = (Math.random() - 0.5) * 130;
+      const drop = this.add
+        .rectangle(x + dx, y + Math.random() * 12, 3, 13, 0x7cc8ff, 0.9)
+        .setDepth(45);
+      this.tweens.add({
+        targets: drop,
+        y: LAVA_Y,
+        alpha: 0,
+        duration: 450 + Math.random() * 450,
+        ease: 'Quad.in',
+        onComplete: () => drop.destroy(),
+      });
+    }
+  }
+
+  // Circular confirm ring above the player; arc fills with dwellTicks.
+  private drawDwellRing(): void {
+    this.dwellRing.clear();
+    if (!this.state.onFlyer || this.state.dwellTicks <= 0) return;
+    const cx = this.player.sprite.x;
+    const cy = this.player.sprite.y - PLAYER_H - 16;
+    const r = 20;
+    const prog = Math.min(1, this.state.dwellTicks / COMMIT_FRAMES);
+    this.dwellRing.fillStyle(0x0c1838, 0.55);
+    this.dwellRing.fillCircle(cx, cy, r + 5);
+    this.dwellRing.lineStyle(5, 0xffffff, 0.22);
+    this.dwellRing.strokeCircle(cx, cy, r);
+    this.dwellRing.lineStyle(5, 0x38f9d7, 1);
+    this.dwellRing.beginPath();
+    this.dwellRing.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2, false);
+    this.dwellRing.strokePath();
   }
 
   private arriveAtNextSection(): void {
@@ -488,7 +569,6 @@ export class GameScene extends Phaser.Scene {
     this.state.onFlyer = null;
     this.state.dwellTicks = 0;
 
-    // Despawn any tortoise left on the platform we just rode away from.
     if (this.tortoise) {
       this.tortoise.destroy();
       this.tortoise = null;
@@ -505,7 +585,7 @@ export class GameScene extends Phaser.Scene {
       this.state.tortoiseSpawnFrame = this.state.animFrame + TORTOISE_FIRST_DELAY;
     } else {
       // Reached the final platform. currentSection becomes sections.length, which
-      // Milestone D reads to open the door.
+      // checkDoor() reads to open the door.
       this.player.setPosition(this.level.finalSolid.x + 40, this.level.finalSolid.y);
       this.state.currentSection = nextIdx;
       this.banner.show('Walk to the door!', 'info');

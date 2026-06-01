@@ -38,17 +38,17 @@ export class Flyer {
     this.label.setDepth(50);
   }
 
-  // Per-frame sine drift while live (mirrors legacy lines 484-493).
-  // `timeMs` is the cumulative scene time in milliseconds.
-  updateDrift(timeMs: number): void {
+  // Per-frame sine drift while live (mirrors legacy lines 484-493). `animFrame`
+  // is the scene's integer frame counter — the SAME clock the vanilla rAF loop
+  // used, so the drift speed matches (keying it off elapsed ms ran ~60x slow).
+  updateDrift(animFrame: number): void {
     if (this.data.state !== 'live') return;
-    const t = (Math.sin(timeMs * 0.001 * this.data.driftSpeed + this.data.phase) + 1) * 0.5;
+    const t = (Math.sin(animFrame * this.data.driftSpeed + this.data.phase) + 1) * 0.5;
     const newX = this.data.travelLeft + t * (this.data.travelRight - this.data.travelLeft);
     this.data.vx = newX - this.data.x;
     this.data.x = newX;
     this.data.y =
-      this.data.baseY +
-      Math.cos(timeMs * 0.001 * this.data.driftSpeed * 0.7 + this.data.phase) * 6;
+      this.data.baseY + Math.cos(animFrame * this.data.driftSpeed * 0.7 + this.data.phase) * 6;
     this.sprite.setPosition(this.data.x, this.data.y);
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
   }
@@ -86,13 +86,16 @@ export class Flyer {
     return arrived;
   }
 
-  // Crashing flyer falls straight down.
+  // Crashing flyer falls and dissolves (the "becomes rain" effect on a wrong
+  // answer). Fades out as it drops; the GameScene spawns the rain droplets.
   updateCrashing(): void {
     if (this.data.state !== 'crashing') return;
-    this.data.y += 5;
+    this.data.y += 8;
     this.sprite.setPosition(this.data.x, this.data.y);
+    this.sprite.setAlpha(Math.max(0, this.sprite.alpha - 0.05));
+    this.label.setAlpha(Math.max(0, this.label.alpha - 0.08));
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
-    if (this.data.y > 900) {
+    if (this.data.y > 900 || this.sprite.alpha <= 0) {
       this.data.state = 'gone';
       this.destroy();
     }
