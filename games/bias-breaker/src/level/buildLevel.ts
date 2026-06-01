@@ -1,6 +1,11 @@
 // Port of legacy/GAME/screens/bias-breaker.js:132-212 (the buildLevel function).
 // Mechanic-for-mechanic; same RNG semantics (uses Math.random for flyer phase
 // and the [0,1,2,3] position shuffle).
+//
+// `buildFlyers` is extracted so the lava-respawn path (GameScene.resetSection)
+// rebuilds a section's flyers through the SAME travelLeft/travelRight math.
+// Legacy lines 655-658 warn that duplicating those bounds incorrectly yields
+// NaN flyer positions (the v13.2 bug) — sharing one helper removes that risk.
 
 import type { Question } from '@gg/shared';
 import {
@@ -16,7 +21,7 @@ import {
   ANSWER_COLORS,
   type FlyerType,
 } from '../constants';
-import type { Flyer, Level, Section, FinalSolid } from './types';
+import type { Flyer, Level, Section, FinalSolid, Solid } from './types';
 
 function shuffle<T>(arr: readonly T[]): T[] {
   const out = arr.slice();
@@ -49,6 +54,45 @@ function flyerHeightFor(type: FlyerType): number {
   }
 }
 
+/**
+ * Build the 4 answer flyers for one section. Shared by `buildLevel` (initial)
+ * and the lava-respawn reset so the travel bounds always match. Mirrors the
+ * inner loop of legacy buildLevel + resetSection (lines 660-692).
+ */
+export function buildFlyers(solid: Solid, flyerType: FlyerType, question: Question): Flyer[] {
+  const travelLeft = solid.x + SOLID_W + 30;
+  const travelRight = solid.x + SECTION_SPACING - 30;
+  const positions = shuffle([0, 1, 2, 3] as const);
+  const flyers: Flyer[] = [];
+  for (let p = 0; p < 4; p++) {
+    const optionIdx = positions[p]!;
+    const fw = flyerWidthFor(flyerType);
+    const fh = flyerHeightFor(flyerType);
+    flyers.push({
+      type: flyerType,
+      travelLeft,
+      travelRight: travelRight - fw,
+      baseY: FLYER_Y_TOP + p * FLYER_Y_STEP,
+      x: travelLeft + p * 30,
+      y: FLYER_Y_TOP + p * FLYER_Y_STEP,
+      w: fw,
+      h: fh,
+      phase: Math.random() * Math.PI * 2,
+      driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.7),
+      vx: 0,
+      rowIndex: p,
+      optionIndex: optionIdx,
+      optionText: question.options[optionIdx]!,
+      isCorrect: optionIdx === question.correct,
+      color: ANSWER_COLORS[p]!,
+      state: 'live',
+      crashStart: 0,
+      carrying: false,
+    });
+  }
+  return flyers;
+}
+
 export function buildLevel(questions: Question[]): Level {
   const sections: Section[] = [];
   // Center the first visible section in the canvas.
@@ -57,41 +101,9 @@ export function buildLevel(questions: Question[]): Level {
 
   for (let i = 0; i < questions.length; i++) {
     const question = questions[i]!;
-    const solid = { x, y: SOLID_Y, w: SOLID_W, h: SOLID_H };
+    const solid: Solid = { x, y: SOLID_Y, w: SOLID_W, h: SOLID_H };
     const flyerType: FlyerType = FLYER_TYPES[i % FLYER_TYPES.length]!;
-
-    const nextSolidX = x + SECTION_SPACING;
-    const travelLeft = x + SOLID_W + 30;
-    const travelRight = nextSolidX - 30;
-
-    const positions = shuffle([0, 1, 2, 3] as const);
-    const flyers: Flyer[] = [];
-    for (let p = 0; p < 4; p++) {
-      const optionIdx = positions[p]!;
-      const fw = flyerWidthFor(flyerType);
-      const fh = flyerHeightFor(flyerType);
-      flyers.push({
-        type: flyerType,
-        travelLeft,
-        travelRight: travelRight - fw,
-        baseY: FLYER_Y_TOP + p * FLYER_Y_STEP,
-        x: travelLeft + p * 30,
-        y: FLYER_Y_TOP + p * FLYER_Y_STEP,
-        w: fw,
-        h: fh,
-        phase: Math.random() * Math.PI * 2,
-        driftSpeed: FLYER_DRIFT_SPEED * (0.7 + Math.random() * 0.7),
-        vx: 0,
-        rowIndex: p,
-        optionIndex: optionIdx,
-        optionText: question.options[optionIdx]!,
-        isCorrect: optionIdx === question.correct,
-        color: ANSWER_COLORS[p]!,
-        state: 'live',
-        crashStart: 0,
-        carrying: false,
-      });
-    }
+    const flyers = buildFlyers(solid, flyerType, question);
 
     sections.push({ question, solid, flyerType, flyers, answered: false });
     x += SECTION_SPACING;

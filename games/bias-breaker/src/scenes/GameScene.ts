@@ -1,23 +1,35 @@
 // GameScene — the playable Bias Breaker level.
 // Milestone A: static world (platforms, lava, doors, background) + player + camera + keyboard.
 // Milestone B: drifting answer flyers + question banner + dwell-to-confirm + carrier-flyer transit.
-// Milestone C (next session): lava respawn (v13.2 NaN-free reset) + tortoise enemy.
-// Milestone D (next session): final door win flow → CelebrationScene.
+// Milestone C: lava fall + v13.2 NaN-free respawn, tortoise enemy (walk/stomp/bump), HUD.
+// Milestone D (next): final door win flow → CelebrationScene + markIslandCleared.
 
 import Phaser from 'phaser';
 import { pickN, type Question } from '@gg/shared';
 import {
-  CANVAS_W,
   CANVAS_H,
+  SOLID_Y,
   LAVA_Y,
   COMMIT_FRAMES,
   WALK_SPEED_PER_S,
+  JUMP_SPEED_PER_S,
+  PLAYER_W,
+  PLAYER_H,
+  TORTOISE_W,
+  TORTOISE_H,
+  TORTOISE_SPEED,
+  TORTOISE_FIRST_DELAY,
+  TORTOISE_RESPAWN_MIN,
+  TORTOISE_RESPAWN_MAX,
+  TORTOISE_STOMP_POINTS,
 } from '../constants';
-import { buildLevel } from '../level/buildLevel';
+import { buildLevel, buildFlyers } from '../level/buildLevel';
 import type { Level, Section } from '../level/types';
 import { Player, type PlayerKeys } from '../entities/Player';
 import { Flyer } from '../entities/Flyer';
+import { Tortoise } from '../entities/Tortoise';
 import { Banner } from '../ui/Banner';
+import { Hud } from '../ui/Hud';
 
 declare const __TEST_SEAM__: boolean;
 
@@ -29,10 +41,11 @@ type GameState = {
   timeMs: number;
   score: number;
   doorEntered: boolean;
+  animFrame: number; // per-frame clock for tortoise scheduling (mirrors legacy animTime)
+  respawning: boolean; // true during the lava fade-out → respawn → fade-in
+  tortoiseSpawnFrame: number; // animFrame at which the next tortoise may appear
+  lastSecond: number; // last whole second pushed to the HUD timer
 };
-
-// Suppress unused-import warning during Milestone A/B (CANVAS_W used by future tasks).
-void CANVAS_W;
 
 export class GameScene extends Phaser.Scene {
   private level!: Level;
@@ -41,6 +54,8 @@ export class GameScene extends Phaser.Scene {
   private flyers: Flyer[] = [];
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private banner!: Banner;
+  private hud!: Hud;
+  private tortoise: Tortoise | null = null;
   private state!: GameState;
 
   constructor() {
@@ -139,12 +154,17 @@ export class GameScene extends Phaser.Scene {
       timeMs: 0,
       score: 0,
       doorEntered: false,
+      animFrame: 0,
+      respawning: false,
+      tortoiseSpawnFrame: TORTOISE_FIRST_DELAY,
+      lastSecond: 0,
     };
 
-    // ---- Flyers for section 0 + banner ----
+    // ---- Flyers for section 0 + banner + HUD ----
     this.banner = new Banner(this);
     this.spawnFlyersForSection(0);
     this.banner.show(this.level.sections[0]!.question.question, 'question');
+    this.hud = new Hud(this, this.level.sections.length);
 
     // ---- Test seam: expose state for Playwright assertions ----
     if (__TEST_SEAM__) {
@@ -155,6 +175,9 @@ export class GameScene extends Phaser.Scene {
         onFlyer: this.state.onFlyer != null,
         carryingFlyer: this.state.carryingFlyer != null,
         doorEntered: this.state.doorEntered,
+        respawning: this.state.respawning,
+        tortoiseAlive: this.tortoise?.alive ?? false,
+        doorOpen: this.level.door.open,
         sections: this.level.sections.length,
       });
     }
@@ -183,10 +206,18 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.state.doorEntered) return;
+    if (this.state.respawning) return; // frozen during the lava fade
+
+    this.state.animFrame++;
 
     // Timer (pauses during carrier transit — matches v13.3 intent)
     if (!this.state.carryingFlyer) {
       this.state.timeMs += delta;
+      const sec = Math.floor(this.state.timeMs / 1000);
+      if (sec !== this.state.lastSecond) {
+        this.state.lastSecond = sec;
+        this.hud.setTimer(sec);
+      }
     }
 
     // Carrier transit takes priority — player is locked to the flyer
@@ -206,6 +237,12 @@ export class GameScene extends Phaser.Scene {
       if (f.data.state === 'live') f.updateDrift(this.state.timeMs);
       else if (f.data.state === 'crashing') f.updateCrashing();
     }
+
+    // Hazards: lava first (may start a respawn fade), then the tortoise.
+    this.checkLava();
+    if (this.state.respawning) return;
+    this.updateTortoise();
+    this.checkTortoiseCollision();
 
     // Detect onFlyer (only for the current section's live flyers)
     this.state.onFlyer = null;
@@ -237,6 +274,128 @@ export class GameScene extends Phaser.Scene {
       }
     } else {
       this.state.dwellTicks = 0;
+    }
+  }
+
+  // ---- Lava + respawn (Milestone C1) ----
+
+  private checkLava(): void {
+    if (this.state.respawning || this.state.doorEntered || this.state.carryingFlyer) return;
+    const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
+    // Player origin is feet, so sprite.y is the bottom. Falling into lava means
+    // the feet dip past LAVA_Y while airborne (standing keeps blocked.down true).
+    if (this.player.sprite.y >= LAVA_Y && !body.blocked.down) {
+      this.state.respawning = true;
+      this.state.dwellTicks = 0;
+      this.state.onFlyer = null;
+      this.cameras.main.fadeOut(250, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.respawnAtSection();
+        this.cameras.main.fadeIn(250, 0, 0, 0);
+        this.state.respawning = false;
+      });
+    }
+  }
+
+  private respawnAtSection(): void {
+    const sec: Section | undefined = this.level.sections[this.state.currentSection];
+    const solid = sec ? sec.solid : this.level.finalSolid;
+    this.player.setPosition(solid.x + 30, solid.y);
+    const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(true);
+
+    this.state.dwellTicks = 0;
+    this.state.onFlyer = null;
+    this.state.carryingFlyer = null;
+
+    // Clear the tortoise and grant full breathing room before the next spawn
+    // (the v13.2 fix: without this the player can respawn straight onto a bump).
+    if (this.tortoise) {
+      this.tortoise.destroy();
+      this.tortoise = null;
+    }
+    this.state.tortoiseSpawnFrame = this.state.animFrame + TORTOISE_FIRST_DELAY;
+
+    // Rebuild this section's flyers (only if still unanswered) through buildFlyers
+    // so travelLeft/travelRight match buildLevel exactly — no NaN labels.
+    if (sec && !sec.answered) {
+      sec.flyers = buildFlyers(sec.solid, sec.flyerType, sec.question);
+      this.spawnFlyersForSection(this.state.currentSection);
+      this.banner.show(sec.question.question, 'question');
+    }
+  }
+
+  // ---- Tortoise (Milestone C2) ----
+
+  private updateTortoise(): void {
+    if (this.state.carryingFlyer || this.state.doorEntered) return;
+    if (this.state.currentSection >= this.level.sections.length) return;
+
+    if (!this.tortoise && this.state.animFrame >= this.state.tortoiseSpawnFrame) {
+      this.spawnTortoise();
+    }
+    const t = this.tortoise;
+    if (!t) return;
+
+    // Despawn if the section advanced under it.
+    if (t.sectionIdx !== this.state.currentSection) {
+      t.destroy();
+      this.tortoise = null;
+      return;
+    }
+    const sec = this.level.sections[this.state.currentSection];
+    if (!sec) return;
+    const status = t.update(this.state.animFrame, sec.solid.x, sec.solid.w);
+    if (status === 'despawn') {
+      t.destroy();
+      this.tortoise = null;
+    }
+  }
+
+  private spawnTortoise(): void {
+    const sec = this.level.sections[this.state.currentSection];
+    if (!sec) return;
+    const solid = sec.solid;
+    const goingRight = Math.random() > 0.5;
+    const x = goingRight ? solid.x + 12 : solid.x + solid.w - TORTOISE_W - 12;
+    const y = SOLID_Y - TORTOISE_H;
+    const vx = goingRight ? TORTOISE_SPEED : -TORTOISE_SPEED;
+    this.tortoise = new Tortoise(this, this.state.currentSection, x, y, vx);
+    // Schedule the next spawn now (legacy line 711).
+    this.state.tortoiseSpawnFrame =
+      this.state.animFrame +
+      TORTOISE_RESPAWN_MIN +
+      Math.floor(Math.random() * (TORTOISE_RESPAWN_MAX - TORTOISE_RESPAWN_MIN));
+  }
+
+  private checkTortoiseCollision(): void {
+    const t = this.tortoise;
+    if (!t || !t.alive) return;
+    const px = this.player.sprite.x; // feet-origin → center x
+    const pBottom = this.player.sprite.y; // feet
+    const pLeft = px - PLAYER_W / 2;
+    const pRight = px + PLAYER_W / 2;
+    const pTop = pBottom - PLAYER_H;
+    const overlap =
+      pRight > t.x && pLeft < t.x + TORTOISE_W && pBottom > t.y && pTop < t.y + TORTOISE_H;
+    if (!overlap) return;
+
+    const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
+    if (body.velocity.y > 0 && pBottom < t.y + 22) {
+      // Stomp from above: +20, kill, bounce off (legacy 758-769).
+      t.kill(this.state.animFrame);
+      this.state.score += TORTOISE_STOMP_POINTS;
+      this.hud.setScore(this.state.score);
+      this.player.sprite.setVelocityY(JUMP_SPEED_PER_S * 0.7);
+      this.banner.show(`🐢 +${TORTOISE_STOMP_POINTS} Tortoise stomped!`, 'correct');
+      this.time.delayedCall(1200, () => {
+        const cur = this.level.sections[this.state.currentSection];
+        if (cur && !this.state.doorEntered) this.banner.show(cur.question.question, 'question');
+      });
+    } else {
+      // Side bump: gentle knockback, no score penalty (legacy 770-775).
+      const tCenter = t.x + TORTOISE_W / 2;
+      this.player.sprite.setVelocityX(px < tCenter ? -240 : 240);
     }
   }
 
@@ -272,6 +431,12 @@ export class GameScene extends Phaser.Scene {
     this.state.onFlyer = null;
     this.state.dwellTicks = 0;
 
+    // Despawn any tortoise left on the platform we just rode away from.
+    if (this.tortoise) {
+      this.tortoise.destroy();
+      this.tortoise = null;
+    }
+
     const nextIdx = this.state.currentSection + 1;
     const nextSec: Section | undefined = this.level.sections[nextIdx];
     if (nextSec) {
@@ -279,10 +444,15 @@ export class GameScene extends Phaser.Scene {
       this.state.currentSection = nextIdx;
       this.spawnFlyersForSection(nextIdx);
       this.banner.show(nextSec.question.question, 'question');
+      this.hud.setSection(nextIdx + 1, this.level.sections.length);
+      this.state.tortoiseSpawnFrame = this.state.animFrame + TORTOISE_FIRST_DELAY;
     } else {
-      // Final platform — Milestone D will trigger the win flow here.
+      // Reached the final platform. currentSection becomes sections.length, which
+      // Milestone D reads to open the door.
       this.player.setPosition(this.level.finalSolid.x + 40, this.level.finalSolid.y);
+      this.state.currentSection = nextIdx;
       this.banner.show('Walk to the door!', 'info');
+      this.hud.setSection(this.level.sections.length, this.level.sections.length);
       for (const f of this.flyers) f.destroy();
       this.flyers = [];
     }
