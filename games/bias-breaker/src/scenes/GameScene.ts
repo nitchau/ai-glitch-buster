@@ -48,7 +48,7 @@ type GameState = {
   respawning: boolean; // true during the lava fade-out → respawn → fade-in
   tortoiseSpawnFrame: number; // animFrame at which the next tortoise may appear
   lastSecond: number; // last whole second pushed to the HUD timer
-  carryHang: boolean; // current carry rides UNDER the flyer (kite / quadcopter)
+  carryMode: 'top' | 'hang' | 'ride'; // how the correct flyer carries you across
 };
 
 export class GameScene extends Phaser.Scene {
@@ -189,7 +189,7 @@ export class GameScene extends Phaser.Scene {
       respawning: false,
       tortoiseSpawnFrame: TORTOISE_FIRST_DELAY,
       lastSecond: 0,
-      carryHang: false,
+      carryMode: 'top',
     };
 
     // ---- Flyers + banner + HUD + dwell ring ----
@@ -268,7 +268,7 @@ export class GameScene extends Phaser.Scene {
       const arrived = this.state.carryingFlyer.updateCarrier(
         this.player.sprite,
         nextSolid,
-        this.state.carryHang
+        this.state.carryMode
       );
       if (arrived) {
         this.arriveAtNextSection();
@@ -514,9 +514,18 @@ export class GameScene extends Phaser.Scene {
       sec.answered = true;
       flyer.data.carrying = true;
       this.state.carryingFlyer = flyer;
-      // Kite & quadcopter carry you hanging underneath; the rest ride on top.
-      this.state.carryHang = flyer.data.type === 'kite' || flyer.data.type === 'quadcopter';
-      this.banner.show(this.state.carryHang ? 'Correct! Hang on!' : 'Correct! Hold on...', 'correct');
+      // Kite & quadcopter carry you hanging underneath; helicopter flies you in
+      // an arc; cloud & bird ride you on top.
+      const t = flyer.data.type;
+      this.state.carryMode =
+        t === 'kite' || t === 'quadcopter' ? 'hang' : t === 'helicopter' ? 'ride' : 'top';
+      const verb =
+        this.state.carryMode === 'hang'
+          ? 'Hang on!'
+          : this.state.carryMode === 'ride'
+            ? 'Hop aboard!'
+            : 'Hold on...';
+      this.banner.show(`Correct! ${verb}`, 'correct');
       for (const f of this.flyers) {
         if (f !== flyer && f.data.state === 'live') {
           f.data.state = 'crashing';

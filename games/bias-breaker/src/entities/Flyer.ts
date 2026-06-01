@@ -11,6 +11,11 @@ export class Flyer {
   readonly sprite: Phaser.Physics.Arcade.Image;
   readonly label: Phaser.GameObjects.Text;
   private carrySwing = 0; // 0 = on top, 1 = fully hanging below (hang carry only)
+  private rotor: Phaser.GameObjects.Rectangle | null = null; // helicopter spinning blade
+  private rotorPhase = 0;
+  private carryStarted = false;
+  private carryStartX = 0;
+  private carryStartY = 0;
 
   constructor(scene: Phaser.Scene, data: FlyerData) {
     this.data = data;
@@ -27,6 +32,13 @@ export class Flyer {
     body.checkCollision.left = false;
     body.checkCollision.right = false;
     body.checkCollision.up = true;
+
+    // Helicopter: a separate main-rotor blade that spins (foreshortens) on top.
+    if (data.type === 'helicopter') {
+      this.rotor = scene.add
+        .rectangle(data.x + data.w / 2, data.y + 3, data.w * 0.84, 5, 0xdfeaff)
+        .setDepth(6);
+    }
 
     this.label = scene.add.text(data.x + data.w / 2, data.y - 28, data.optionText, {
       fontFamily: 'Arial, sans-serif',
@@ -52,31 +64,60 @@ export class Flyer {
       this.data.baseY + Math.cos(animFrame * this.data.driftSpeed * 0.7 + this.data.phase) * 6;
     this.sprite.setPosition(this.data.x, this.data.y);
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
+    this.updateRotor();
   }
 
-  // Carrier transit toward the next platform. Returns true when arrived.
-  // INCLUDES the v13.3 snap-when-close fix (otherwise the lerp tail makes
-  // the player visibly hang in the air for ~1.3s).
-  updateCarrier(player: Phaser.Physics.Arcade.Sprite, nextSolid: Solid, hang = false): boolean {
+  // Carrier transit toward the next platform. `mode` picks the ride:
+  //   'top'  — stand on top (cloud / bird), straight brisk lerp.
+  //   'hang' — dangle underneath (kite / quadcopter); the flyer rides higher.
+  //   'ride' — helicopter: stand on top and fly across in a little up-and-over
+  //            arc instead of a straight line.
+  // Returns true when arrived. Includes the v13.3 snap-when-close fix.
+  updateCarrier(
+    player: Phaser.Physics.Arcade.Sprite,
+    nextSolid: Solid,
+    mode: 'top' | 'hang' | 'ride' = 'top'
+  ): boolean {
+    const hang = mode === 'hang';
+    const ride = mode === 'ride';
     const targetX = nextSolid.x + 30;
-    // When hanging (kite / quadcopter) the flyer rides higher so the player
-    // dangling underneath lands with their feet on the platform surface.
+    // When hanging the flyer rides higher so the dangling player lands feet-first.
     const targetY = hang ? nextSolid.y - PLAYER_H - this.data.h : nextSolid.y;
-    const remX = targetX - this.data.x;
-    const remY = targetY - this.data.y;
-    const dist = Math.hypot(remX, remY);
 
-    if (dist < 20) {
-      // SNAP — closes the asymptote tail
-      this.data.x = targetX;
-      this.data.y = targetY;
-    } else {
-      // Brisk lerp (decay 0.18 vs legacy's original 0.06)
-      this.data.x += remX * 0.18;
-      this.data.y += remY * 0.18;
+    if (!this.carryStarted) {
+      this.carryStarted = true;
+      this.carryStartX = this.data.x;
+      this.carryStartY = this.data.y;
     }
+
+    if (ride) {
+      // Fly-up arc: glide across at a steady pace with an ease-in (t^2) descent,
+      // so the sine bump reads as a clear up-and-over hop no matter the heights
+      // (a plain linear descent buried the lift when starting high).
+      const span = targetX - this.carryStartX;
+      const step = Math.max(4, Math.abs(span) * 0.05);
+      this.data.x =
+        span >= 0
+          ? Math.min(targetX, this.data.x + step)
+          : Math.max(targetX, this.data.x - step);
+      const t = span !== 0 ? Math.min(1, Math.max(0, (this.data.x - this.carryStartX) / span)) : 1;
+      const baseY = this.carryStartY + (targetY - this.carryStartY) * t * t;
+      this.data.y = baseY - 140 * Math.sin(Math.PI * t);
+    } else {
+      const remX = targetX - this.data.x;
+      const remY = targetY - this.data.y;
+      if (Math.hypot(remX, remY) < 20) {
+        this.data.x = targetX;
+        this.data.y = targetY;
+      } else {
+        this.data.x += remX * 0.18;
+        this.data.y += remY * 0.18;
+      }
+    }
+
     this.sprite.setPosition(this.data.x, this.data.y);
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
+    this.updateRotor();
 
     // Lock player to flyer during transit.
     const playerBody = player.body as Phaser.Physics.Arcade.Body;
@@ -93,9 +134,17 @@ export class Flyer {
       player.setPosition(this.data.x + this.data.w / 2, this.data.y);
     }
 
-    // Arrival
-    const arrived = Math.abs(this.data.x - targetX) < 4 && Math.abs(this.data.y - targetY) < 4;
-    return arrived;
+    // Arrival (ride matches on x — the arc lands y at the platform when t hits 1).
+    const arrivedX = Math.abs(this.data.x - targetX) < 4;
+    return ride ? arrivedX : arrivedX && Math.abs(this.data.y - targetY) < 4;
+  }
+
+  // Helicopter main rotor: the blade foreshortens (scaleX) as it spins, fast.
+  private updateRotor(): void {
+    if (!this.rotor) return;
+    this.rotorPhase += 0.8;
+    this.rotor.setPosition(this.data.x + this.data.w / 2, this.data.y + 3);
+    this.rotor.setScale(Math.max(0.08, Math.abs(Math.cos(this.rotorPhase))), 1);
   }
 
   // Crashing flyer falls and dissolves (the "becomes rain" effect on a wrong
@@ -107,6 +156,10 @@ export class Flyer {
     this.sprite.setAlpha(Math.max(0, this.sprite.alpha - 0.05));
     this.label.setAlpha(Math.max(0, this.label.alpha - 0.08));
     this.label.setPosition(this.data.x + this.data.w / 2, this.data.y - 18);
+    if (this.rotor) {
+      this.rotor.setPosition(this.data.x + this.data.w / 2, this.data.y + 3);
+      this.rotor.setAlpha(Math.max(0, this.rotor.alpha - 0.05));
+    }
     if (this.data.y > 900 || this.sprite.alpha <= 0) {
       this.data.state = 'gone';
       this.destroy();
@@ -116,6 +169,7 @@ export class Flyer {
   destroy(): void {
     this.label.destroy();
     this.sprite.destroy();
+    this.rotor?.destroy();
   }
 }
 
@@ -186,8 +240,7 @@ function ensureFlyerTexture(
     g.fillTriangle(w * 0.47, kb + 3, w * 0.4, kb - 1, w * 0.4, kb + 7);
     g.fillTriangle(w * 0.5, kb + 6, w * 0.57, kb + 2, w * 0.57, kb + 10);
   } else if (type === 'helicopter') {
-    g.fillStyle(tint); // main rotor (top)
-    g.fillRect(w * 0.08, 2, w * 0.84, 5);
+    // Main rotor is a separate spinning overlay (see the Flyer constructor).
     g.fillStyle(DARK);
     g.fillRect(w * 0.5, 6, 4, h * 0.22); // mast
     g.fillStyle(tint);
