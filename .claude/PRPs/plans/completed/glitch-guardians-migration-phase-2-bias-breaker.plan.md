@@ -466,7 +466,7 @@ Organized into **5 milestones**. Each milestone is independently playable / test
 
 ---
 
-### Milestone E — Tests + full quiz port
+### Milestone E — Tests + full quiz port  ✅ DONE (commit `9e0c6c4`, Session 3)
 
 **E1: Vitest unit tests**
 - **ACTION**: Add `tests/unit/level.test.ts` and `scoring.test.ts`.
