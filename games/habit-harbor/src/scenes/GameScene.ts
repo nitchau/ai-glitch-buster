@@ -21,6 +21,7 @@ import { Bot } from '../entities/Bot';
 import { Hud } from '../ui/Hud';
 import { Banner } from '../ui/Banner';
 import { QuizModal, type Choice } from '../ui/QuizModal';
+import { timeToStars } from '../scoring';
 import { pickN, type Question } from '@gg/shared';
 
 declare const __TEST_SEAM__: boolean;
@@ -120,6 +121,7 @@ export class GameScene extends Phaser.Scene {
         timeMs: this.state.timeMs,
         paused: this.state.paused,
         won: this.state.won,
+        atExit: this.atExit(),
         quizOpen: this.modal.isOpen,
         activeBot: this.state.activeBot?.id ?? null,
         openGates: Object.keys(this.state.openGates).filter((k) => this.state.openGates[k]),
@@ -151,6 +153,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.boat.update(dir, delta / 1000, (px, py) => this.hitsWall(px, py));
     this.checkBotCollision();
+    this.checkExit();
   }
 
   // ---- rescue quiz flow ----------------------------------------------------
@@ -212,6 +215,44 @@ export class GameScene extends Phaser.Scene {
     this.banner.show(message, kind);
     this.bannerTimer?.remove();
     this.bannerTimer = this.time.delayedCall(1900, () => this.banner.hide());
+  }
+
+  // ---- win: reach the harbor mouth after freeing every bot ------------------
+
+  private atExit(): boolean {
+    return (
+      Math.floor(this.boat.px / CELL) === this.maze.exit.c &&
+      Math.floor(this.boat.py / CELL) === this.maze.exit.r
+    );
+  }
+
+  // Once all five bots are rescued, sailing into the exit cell wins.
+  private checkExit(): void {
+    if (this.state.won) return;
+    if (this.state.rescued < RESCUE_TOTAL) return;
+    if (this.atExit()) this.enterExit();
+  }
+
+  private enterExit(): void {
+    this.state.won = true; // freezes the update loop
+    this.banner.show('🎉 Home! The harbor is safe.', 'correct');
+    // Boat sails into the glow; fade, then hand off to the celebration.
+    this.tweens.add({
+      targets: this.boat.sprite,
+      scale: 0.4,
+      alpha: 0.5,
+      duration: 500,
+      ease: 'Sine.in',
+    });
+    this.cameras.main.fadeOut(700, 7, 39, 56);
+    this.time.delayedCall(900, () => {
+      const finalSec = Math.floor(this.state.timeMs / 1000);
+      this.scene.start('CelebrationScene', {
+        stars: timeToStars(finalSec),
+        time: finalSec,
+        rescued: this.state.rescued,
+      });
+    });
   }
 
   // The boat's bounding box (±BOAT_R) overlaps up to four cells — block if ANY is
