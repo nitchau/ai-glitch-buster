@@ -8,6 +8,7 @@ import {
   AVATAR_SKINS,
   ensureAvatarTextures,
   avatarTextureKey,
+  personaFor,
   loadAvatarChoice,
   saveAvatarChoice,
   type AvatarGender,
@@ -38,7 +39,7 @@ export class AvatarSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add
-      .text(width / 2, height * 0.22, 'Tap a character, then press Play', {
+      .text(width / 2, height * 0.22, 'Tap your Guardian, then press Play', {
         fontFamily: 'Arial, sans-serif',
         fontSize: '24px',
         color: '#cfeefe',
@@ -55,22 +56,31 @@ export class AvatarSelectScene extends Phaser.Scene {
 
     combos.forEach((combo, i) => {
       ensureAvatarTextures(this, combo.gender, combo.skin);
+      const persona = personaFor(combo.gender, combo.skin);
       const x = startX + i * gap;
       const ring = this.add
-        .rectangle(x, cardY, 212, 292)
+        .rectangle(x, cardY, 214, 314)
         .setStrokeStyle(5, 0x43e97b)
         .setVisible(false);
       const card = this.add
-        .rectangle(x, cardY, 200, 280, 0x14224a, 0.95)
+        .rectangle(x, cardY, 200, 300, 0x14224a, 0.95)
         .setStrokeStyle(2, 0x2a3a66)
         .setInteractive({ useHandCursor: true });
-      this.add.image(x, cardY - 8, avatarTextureKey(combo.gender, combo.skin, 'idle')).setScale(1.7);
-      const label = `${combo.gender === 'boy' ? 'Boy' : 'Girl'} · ${combo.skin === 'light' ? 'Light' : 'Dark'}`;
       this.add
-        .text(x, cardY + 118, label, {
+        .image(x, cardY - 28, avatarTextureKey(combo.gender, combo.skin, 'idle'))
+        .setScale(1.7);
+      this.add
+        .text(x, cardY + 86, persona.name, {
+          fontFamily: 'Arial Black, sans-serif',
+          fontSize: '26px',
+          color: '#ffffff',
+        })
+        .setOrigin(0.5);
+      this.add
+        .text(x, cardY + 116, persona.title, {
           fontFamily: 'Arial, sans-serif',
-          fontSize: '20px',
-          color: '#cfeefe',
+          fontSize: '15px',
+          color: '#43e97b',
         })
         .setOrigin(0.5);
       card.on('pointerdown', () => this.select(combo));

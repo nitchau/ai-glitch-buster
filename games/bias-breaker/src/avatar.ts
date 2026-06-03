@@ -16,6 +16,26 @@ export type AvatarFrame = 'idle' | 'walk0' | 'walk1';
 export const AVATAR_SKINS: readonly AvatarSkin[] = ['light', 'dark'];
 export const AVATAR_GENDERS: readonly AvatarGender[] = ['boy', 'girl'];
 
+export type AvatarPersona = { name: string; title: string };
+
+// Presentation only: each of the four Guardians gets a name + a Datapolis hero
+// title (shown on the picker instead of a bare gender/skin label). The saved
+// choice + the art are still keyed by gender/skin.
+const PERSONA: Record<AvatarGender, Record<AvatarSkin, AvatarPersona>> = {
+  boy: {
+    light: { name: 'Leo', title: 'Fairness Champion' },
+    dark: { name: 'Kai', title: 'Bias Buster' },
+  },
+  girl: {
+    light: { name: 'Mia', title: 'Truth Seeker' },
+    dark: { name: 'Zara', title: 'Data Detective' },
+  },
+};
+
+export function personaFor(gender: AvatarGender, skin: AvatarSkin): AvatarPersona {
+  return PERSONA[gender][skin];
+}
+
 const STORAGE_KEY = 'gg.bias.avatar';
 
 const SKIN_COLOR: Record<AvatarSkin, number> = {
