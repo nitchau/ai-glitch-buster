@@ -1,11 +1,27 @@
-// The harbor maze scene. Milestone A = static render (water / docks / gates /
-// exit) + a movable boat with per-axis dock collision. Bots, the rescue quiz,
-// gate-opening, the HUD and the win flow arrive in later milestones.
+// The harbor maze scene. Milestones A+B: static render (water/docks/gates/exit)
+// + boat with per-axis dock collision, plus the five helper-bots, the drive-into
+// rescue quiz, gate-opening, and the HUD. The win flow + celebration land in
+// Milestone C.
 
 import Phaser from 'phaser';
-import { CANVAS_W, CANVAS_H, CELL, COLS, ROWS, BOAT_R, RESCUE_TOTAL, COLOR } from '../constants';
+import {
+  CANVAS_W,
+  CANVAS_H,
+  CELL,
+  COLS,
+  ROWS,
+  BOAT_R,
+  BOT_HIT,
+  RESCUE_TOTAL,
+  COLOR,
+} from '../constants';
 import { buildMaze, isWall, type MazeModel, type OpenGates } from '../maze';
 import { Boat, type Dir } from '../entities/Boat';
+import { Bot } from '../entities/Bot';
+import { Hud } from '../ui/Hud';
+import { Banner } from '../ui/Banner';
+import { QuizModal, type Choice } from '../ui/QuizModal';
+import { pickN, type Question } from '@gg/shared';
 
 declare const __TEST_SEAM__: boolean;
 
@@ -18,8 +34,11 @@ type GameState = {
   paused: boolean;
   rescued: number;
   timeMs: number;
+  lastSec: number;
   animFrame: number;
   won: boolean;
+  activeBot: Bot | null;
+  qPool: Question[];
 };
 
 export class GameScene extends Phaser.Scene {
@@ -28,6 +47,11 @@ export class GameScene extends Phaser.Scene {
   private keys!: Keys;
   private gateGfx!: Phaser.GameObjects.Graphics;
   private dpad: Record<DpadDir, boolean> = { left: false, right: false, up: false, down: false };
+  private bots: Bot[] = [];
+  private hud!: Hud;
+  private banner!: Banner;
+  private modal!: QuizModal;
+  private bannerTimer?: Phaser.Time.TimerEvent;
   private state!: GameState;
 
   constructor() {
@@ -42,7 +66,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.maze = buildMaze();
-    this.state = { openGates: {}, paused: false, rescued: 0, timeMs: 0, animFrame: 0, won: false };
+    this.state = {
+      openGates: {},
+      paused: false,
+      rescued: 0,
+      timeMs: 0,
+      lastSec: -1,
+      animFrame: 0,
+      won: false,
+      activeBot: null,
+      qPool: [],
+    };
+    this.bots = [];
 
     this.cameras.main.setBounds(0, 0, CANVAS_W, CANVAS_H);
     this.cameras.main.setBackgroundColor('#0a2738');
@@ -52,6 +87,11 @@ export class GameScene extends Phaser.Scene {
     this.gateGfx = this.add.graphics().setDepth(20);
     this.drawGates();
     this.drawExit();
+
+    // The five glitchy helper-bots, each on its maze cell.
+    for (const b of this.maze.bots) {
+      this.bots.push(new Bot(this, { id: b.id, c: b.c, r: b.r, gate: b.gate }));
+    }
 
     const sx = this.maze.spawn.c * CELL + CELL / 2;
     const sy = this.maze.spawn.r * CELL + CELL / 2;
@@ -69,6 +109,10 @@ export class GameScene extends Phaser.Scene {
     }) as Keys;
     this.buildDpad();
 
+    this.hud = new Hud(this, RESCUE_TOTAL);
+    this.banner = new Banner(this);
+    this.modal = new QuizModal(this);
+
     if (__TEST_SEAM__) {
       (window as unknown as { __GAME_STATE__: () => unknown }).__GAME_STATE__ = () => ({
         rescued: this.state.rescued,
@@ -76,6 +120,9 @@ export class GameScene extends Phaser.Scene {
         timeMs: this.state.timeMs,
         paused: this.state.paused,
         won: this.state.won,
+        quizOpen: this.modal.isOpen,
+        activeBot: this.state.activeBot?.id ?? null,
+        openGates: Object.keys(this.state.openGates).filter((k) => this.state.openGates[k]),
         px: this.boat.px,
         py: this.boat.py,
       });
@@ -83,9 +130,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.state.paused || this.state.won) return;
+    if (this.state.won) return;
     this.state.animFrame++;
+    for (const bot of this.bots) bot.update(this.state.animFrame);
+
+    if (this.state.paused) return; // quiz open: freeze boat + timer
+
     this.state.timeMs += delta;
+    const sec = Math.floor(this.state.timeMs / 1000);
+    if (sec !== this.state.lastSec) {
+      this.state.lastSec = sec;
+      this.hud.setTimer(sec);
+    }
 
     const dir: Dir = {
       left: this.keys.left.isDown || this.keys.A.isDown || this.dpad.left,
@@ -94,6 +150,68 @@ export class GameScene extends Phaser.Scene {
       down: this.keys.down.isDown || this.keys.S.isDown || this.dpad.down,
     };
     this.boat.update(dir, delta / 1000, (px, py) => this.hitsWall(px, py));
+    this.checkBotCollision();
+  }
+
+  // ---- rescue quiz flow ----------------------------------------------------
+
+  // Drive the boat into a stuck bot (centre within BOT_HIT) → open its quiz.
+  private checkBotCollision(): void {
+    for (const bot of this.bots) {
+      if (bot.rescued) continue;
+      const dx = this.boat.px - bot.cxc;
+      const dy = this.boat.py - bot.cyc;
+      if (dx * dx + dy * dy < BOT_HIT * BOT_HIT) {
+        this.openQuiz(bot);
+        return;
+      }
+    }
+  }
+
+  private nextQuestion(): Question {
+    if (!this.state.qPool.length) this.state.qPool = pickN('bad-habits', 8);
+    return this.state.qPool.pop() as Question;
+  }
+
+  private openQuiz(bot: Bot): void {
+    this.state.paused = true; // freezes boat + timer
+    this.state.activeBot = bot;
+    this.modal.open(this.nextQuestion(), null, (choice) => this.answer(choice, bot));
+  }
+
+  private answer(choice: Choice, bot: Bot): void {
+    if (choice.isCorrect) {
+      this.rescue(bot);
+      this.modal.close();
+      this.state.paused = false;
+      this.state.activeBot = null;
+    } else {
+      // never punishes — a friendly nudge + a fresh question for the same bot
+      this.modal.open(
+        this.nextQuestion(),
+        "🙅 Not quite — that's still a bad habit. Look for the kind, clear, honest choice!",
+        (c) => this.answer(c, bot)
+      );
+    }
+  }
+
+  private rescue(bot: Bot): void {
+    bot.rescue(); // turns green + stops jittering
+    this.state.openGates[bot.gate] = true; // movement collision reads this immediately
+    this.state.rescued++;
+    this.hud.setRescued(this.state.rescued, RESCUE_TOTAL);
+    this.drawGates(); // re-render the now-open gate
+    if (this.state.rescued >= RESCUE_TOTAL) {
+      this.flashBanner('🎉 All bots freed! Find the harbor mouth →', 'correct');
+    } else {
+      this.flashBanner('🤖 Fixed! A gate opened ✓', 'correct');
+    }
+  }
+
+  private flashBanner(message: string, kind: 'correct' | 'info'): void {
+    this.banner.show(message, kind);
+    this.bannerTimer?.remove();
+    this.bannerTimer = this.time.delayedCall(1900, () => this.banner.hide());
   }
 
   // The boat's bounding box (±BOAT_R) overlaps up to four cells — block if ANY is
@@ -171,7 +289,7 @@ export class GameScene extends Phaser.Scene {
     g.strokePath();
   }
 
-  // Re-rendered whenever a gate opens (called again from the rescue flow later).
+  // Re-rendered whenever a gate opens (called again from the rescue flow).
   private drawGates(): void {
     const g = this.gateGfx;
     g.clear();
@@ -233,13 +351,13 @@ export class GameScene extends Phaser.Scene {
         .rectangle(x, y, 46, 46, 0x14224a, 0.82)
         .setStrokeStyle(2, 0x43e97b)
         .setScrollFactor(0)
-        .setDepth(200)
+        .setDepth(110)
         .setInteractive({ useHandCursor: true });
       this.add
         .text(x, y, label, { fontFamily: 'Arial', fontSize: '22px', color: '#cfeefe' })
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(201);
+        .setDepth(111);
       const set = (v: boolean) => () => {
         this.dpad[key] = v;
       };
