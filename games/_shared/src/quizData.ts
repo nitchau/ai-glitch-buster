@@ -2,9 +2,9 @@ import type { Question, BankId } from './types';
 
 // Forked from app/index.html (the main AI Glitch Buster app).
 //
-// Phase 1 deviation from plan: ports starter sets (8 questions/bank).
-// Full content migration happens in each island's own phase:
-//   - bias          -> Phase 2 (Bias Breaker rebuild)      — index.html lines ~1274-1875
+// Content migration is per island phase; banks below their phase are still
+// 8-question starters. Status:
+//   - bias          -> FULL bank ported (60 Q, Phase 2)    — index.html lines ~1274-1875
 //   - bad-habits    -> Phase 3 (BHH rebuild)               — index.html lines ~1876-2477
 //   - privacy       -> Phase 5 (Privacy Vault)             — index.html lines ~2478-3083
 //   - hallucination -> Phase 6 (Hallucination Tower)       — index.html lines ~672-1273
@@ -34,58 +34,502 @@ export const quizDataBias: Question[] = [
     correct: 0,
   },
   {
-    question: 'AI blocks some kids just because of their school. Why unfair?',
+    question: 'AI only shows pictures of dogs when asked about pets. Why is this biased?',
     options: [
-      'It treats people unfairly based on group',
-      'Schools matter',
-      'Some kids are unsafe',
-      'Computers always know best',
+      'It ignores other pets',
+      'Dogs are the only animal',
+      'AI loves dogs',
+      "Cats don't count",
     ],
     correct: 0,
   },
   {
-    question: "AI sorts kids into 'good' or 'bad' from a photo. What's wrong?",
-    options: ["You can't judge by looks", 'Photos are clear', 'AI is smart enough', 'Names are bad'],
-    correct: 0,
-  },
-  {
-    question:
-      'Two kids give the same answer. AI scores one higher just for typing fast. Is it fair?',
+    question: 'AI suggests only one type of food when asked for dinner ideas. Why is this bias?',
     options: [
-      'No - same answer, same score',
-      'Yes - speed matters',
-      "Only if they're older",
-      'Fast is always better',
+      'It limits choices unfairly',
+      'It wants that food',
+      'Food is boring',
+      'It is allergic',
     ],
     correct: 0,
   },
   {
-    question: "What's the BEST way to spot if an AI is being unfair?",
+    question: "AI always picks male names for leaders. What's wrong?",
     options: [
-      'Test it with many different people and compare',
-      'Trust it - AI knows',
-      'Ask one expert',
-      'Just read the code',
+      'It is being unfair to girls',
+      'Boys are always leaders',
+      'AI likes boys',
+      'Girls are too busy',
     ],
     correct: 0,
   },
   {
-    question: "AI trained on data from one country misjudges others. What's the problem?",
+    question: 'AI only shows one kind of person in superhero drawings. Why is that bias?',
     options: [
-      'Biased training data',
-      'AI tried its best',
-      'Other countries should change',
-      'Limit it to home',
+      'It leaves other people out',
+      'Only one type can be a hero',
+      'Heroes are rare',
+      'AI forgot',
     ],
     correct: 0,
   },
   {
-    question: 'An AI grades essays lower if they use longer words. Is it biased?',
+    question: 'AI says only young people use computers. Why is this biased?',
     options: [
-      'Yes - judging style not meaning',
-      'No - longer is better',
-      'Only for older kids',
-      'Only for one topic',
+      'Many ages use computers',
+      'Only kids are smart',
+      "Adults don't learn",
+      'AI is silly',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI recommends only one sport for kids. Why is that unfair?',
+    options: [
+      'Kids like many sports',
+      'One sport is enough',
+      'AI likes that sport',
+      'Sports are boring',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI says only one country has good music. What is this?',
+    options: ['A bias', 'A fact', 'A science rule', 'A surprise'],
+    correct: 0,
+  },
+  {
+    question: 'AI only suggests boy names for gamers. Why wrong?',
+    options: ['Anyone can be a gamer', "Girls don't play", 'Gaming is for boys', 'AI is joking'],
+    correct: 0,
+  },
+  {
+    question: 'AI shows only one skin tone in its drawings. What is that?',
+    options: ['Bias', 'Art', 'History', 'A math error'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives harder questions only to certain people. Why is this bad?',
+    options: [
+      'It treats people unequally',
+      'Hard questions are fun',
+      'Only some like math',
+      'AI is confused',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI only recommends books about one culture. What is this?',
+    options: ['Bias', 'A dream', 'A math rule', 'A celebration'],
+    correct: 0,
+  },
+  {
+    question: 'AI says only boys like robots. Why wrong?',
+    options: ['Anyone can like robots', 'Robots pick boys', 'Girls fear robots', 'AI hates robots'],
+    correct: 0,
+  },
+  {
+    question: "AI always picks the same 'best student.' What does this show?",
+    options: ['Unfair preference', 'The student is magic', 'The AI is bored', 'The class is small'],
+    correct: 0,
+  },
+  {
+    question: 'AI suggests only one hairstyle for everyone. Why is that bias?',
+    options: [
+      'People have different styles',
+      'Only one looks good',
+      'AI likes matching',
+      'Hair is confusing',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI gives nicer comments to some people. What is this?',
+    options: ['Bias', 'Kindness', 'Surprise', 'Randomness'],
+    correct: 0,
+  },
+  {
+    question: 'AI says only one type of person can cook well. Why is this wrong?',
+    options: [
+      'Anyone can learn to cook',
+      'Cooking chooses people',
+      'Only chefs cook',
+      'Food is magic',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI guesses careers based on looks. What is this showing?',
+    options: ['Bias', 'Skills', 'Fun', 'Science'],
+    correct: 0,
+  },
+  {
+    question: 'AI only recommends boys for math tutoring. Why wrong?',
+    options: ['Girls are good at math too', 'Boys own math', 'Math is pink', 'AI is tired'],
+    correct: 0,
+  },
+  {
+    question: 'AI translates words differently based on gender. What is this?',
+    options: ['Biased behavior', 'Smartness', 'A joke', 'Creativity'],
+    correct: 0,
+  },
+  {
+    question: 'AI only shows pictures of one type of family. What is that?',
+    options: ['Bias', 'History lesson', 'Holiday art', 'Science experiment'],
+    correct: 0,
+  },
+  {
+    question: 'AI assumes all grandparents are the same age. Why wrong?',
+    options: ['People age differently', 'Only one age exists', 'Time is fake', 'AI is guessing'],
+    correct: 0,
+  },
+  {
+    question: 'AI makes rude guesses about people. What is this?',
+    options: ['Bias', 'Humor', 'Love', 'Data'],
+    correct: 0,
+  },
+  {
+    question: 'AI thinks only one type of person likes art. Why biased?',
+    options: ['Art is for everyone', 'Only artists matter', 'Paint is special', 'AI loves colors'],
+    correct: 0,
+  },
+  {
+    question: 'AI assumes hobbies based on names. Why wrong?',
+    options: [
+      "Names don't decide hobbies",
+      'Names give magic powers',
+      'Names choose sports',
+      'AI likes names',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI picks favorites for no reason. What is that?',
+    options: ['Bias', 'Luck', 'Science', 'Weather'],
+    correct: 0,
+  },
+  {
+    question: 'AI says only one type of person likes reading. Why wrong?',
+    options: [
+      'Anyone can like reading',
+      'Only readers read',
+      'Books choose readers',
+      'AI is guessing',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI only shows certain people as doctors. What is this?',
+    options: ['Bias', 'Medical history', 'Movie fact', 'Geography'],
+    correct: 0,
+  },
+  {
+    question: 'AI recommends careers based on gender. Why is that unfair?',
+    options: [
+      'People choose their own paths',
+      'AI chooses for them',
+      'Paths are limited',
+      'Only one job exists',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we stop AI from thinking only boys like soccer?',
+    options: [
+      'Teach it that everyone can enjoy any sport',
+      'Only show it pictures of boys playing',
+      'Ignore girls who play sports',
+      'Tell it soccer is only for boys',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can AI show all skin tones fairly?',
+    options: [
+      'Use diverse pictures of all people',
+      'Only use light-colored images',
+      'Skip darker photos',
+      'Keep using old pictures',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'When AI gives certain jobs only to some groups, how can we fix that?',
+    options: [
+      'Train AI with examples of all types of people doing many jobs',
+      'Keep old job data',
+      'Let it choose unfairly',
+      'Hide some careers',
+    ],
+    correct: 0,
+  },
+  {
+    question: "What helps AI understand everyone's way of speaking?",
+    options: [
+      'Teach it many accents and word styles',
+      'Use only one language',
+      'Avoid training it on new voices',
+      'Ignore people with different accents',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we stop AI from thinking only certain kids are good at math?',
+    options: [
+      'Give it examples of all kids learning math',
+      'Train it only on top students',
+      'Say math is for boys',
+      'Skip real practice examples',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI guesses gender names wrong sometimes — how can we help it?',
+    options: [
+      'Teach it names from many cultures',
+      'Only teach English names',
+      'Guess randomly',
+      'Avoid learning new names',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'When AI guesses ages from photos, how can errors be reduced?',
+    options: [
+      'Train with real data and ask permission first',
+      'Guess based on looks alone',
+      'Avoid checking sources',
+      'Only use adult photos',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'If AI hears some voices better, how do we make it fair?',
+    options: [
+      'Include voices from different tones and pitch levels',
+      'Test only one speaker',
+      'Use noisy recordings',
+      'Skip quiet voices',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we avoid AI showing ads to only some people?',
+    options: [
+      'Make sure ads reach everyone equally',
+      'Target only one region',
+      'Show ads to one group',
+      'Block some users',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we fix unfair school AI that gives easy homework to some kids?',
+    options: [
+      'Set the same fair standards for everyone',
+      "Give harder work to kids it 'likes'",
+      'Reduce lessons for one group',
+      'Avoid checking scores',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI thinks tall people always play sports. What's right to do?",
+    options: [
+      'Train it to see tall and short people in many roles',
+      'Only show tall athletes',
+      'Skip photos of short people',
+      'Guess based on height',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we stop AI from grading unfairly?',
+    options: [
+      'Check grading rules and balance data',
+      'Keep unfair patterns',
+      'Ignore grade differences',
+      'Use random scores',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI guesses skin color wrong — what helps?',
+    options: [
+      'Use high-quality, well-lit, balanced photos',
+      'Only use selfies',
+      'Train with cartoons',
+      'Avoid checking data',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'What fixes AI showing only one kind of pet?',
+    options: [
+      'Add cats, birds, fish, and all types of pets',
+      'Only show dogs',
+      'Delete pet pictures',
+      'Ignore animal variety',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can AI avoid mixing up people with similar names?',
+    options: [
+      'Always match with extra details like school or photo ID',
+      'Guess which name sounds right',
+      'Pick one name randomly',
+      'Ignore differences',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI thinks some foods belong to certain kids. How can we prevent that?',
+    options: [
+      'Use examples showing everyone enjoying many foods',
+      'Only show people eating one meal',
+      'Keep old menus',
+      'Skip food examples',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI says boys play games, not girls — how to fix that?',
+    options: [
+      'Train it with both boys and girls gaming',
+      'Only use boy players',
+      'Skip gaming data',
+      "Let it guess players' gender",
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI believes certain jobs are only for certain people — what stops that?',
+    options: [
+      'Use pictures of everyone doing many jobs',
+      'Keep old unfair data',
+      'Ban some jobs in training',
+      'Guess jobs from gender',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How to make AI understand that music taste is personal?',
+    options: [
+      'Show that anyone can like any song',
+      'Play one kind of music',
+      'Use only one playlist',
+      'Label songs by group',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI struggles with accents and jokes — how do we fix that?',
+    options: [
+      'Expose AI to global voices and humor styles',
+      'Only use one accent',
+      'Avoid humor training',
+      'Delete language data',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI mixes up names from countries — how to reduce that?',
+    options: [
+      'Include international names during training',
+      'Remove foreign names',
+      'Use only local data',
+      'Skip name checking',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'What stops AI from thinking nurses are always women?',
+    options: [
+      'Train it with male and female nurses',
+      'Use old pictures',
+      'Label nurses by gender',
+      'Skip nurse images',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI guesses a person's job from their clothing color — how to fix that?",
+    options: [
+      'Train using many job outfits and colors',
+      'Use one color for all jobs',
+      'Let it guess by uniform',
+      'Avoid testing it',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'If AI skips people using different slang, what do we do?',
+    options: [
+      'Teach it many language styles',
+      'Ignore slang users',
+      'Block casual words',
+      'Train only on formal speech',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How do we stop AI from thinking only men can be doctors?',
+    options: [
+      'Use examples of women doctors too',
+      'Keep showing male doctors',
+      'Use one gender',
+      'Skip doctor data',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can AI show people who wear glasses fairly?',
+    options: [
+      'Include many images with and without glasses',
+      'Remove all glasses',
+      'Use only one person',
+      'Avoid face pictures',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI says some kids don't like reading — what helps fix it?",
+    options: [
+      'Teach it that everyone can enjoy books',
+      'Ban books',
+      'Only show fast readers',
+      'Assume by gender',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI believes girls only like dolls — how to prevent that?',
+    options: [
+      "Train it with data showing all kids' hobbies",
+      'Use old toy ads',
+      'Avoid showing sports',
+      'Keep stereotypes',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can AI avoid guessing curly-haired people love basketball?',
+    options: [
+      'Use real examples showing many interests',
+      'Link hair to sports',
+      'Skip hairstyles',
+      'Guess randomly',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI says accents mean someone isn't smart — what do we teach it?",
+    options: [
+      'That accent has nothing to do with intelligence',
+      'Prefer one accent',
+      'Ignore accent learning',
+      'Rank voices by speech',
     ],
     correct: 0,
   },
@@ -212,7 +656,12 @@ export const quizDataPrivacy: Question[] = [
   },
   {
     question: 'AI asks for a photo of your face. What should you do?',
-    options: ['Do not share - faces are private', 'Share it', 'Send many photos', 'Tag friends too'],
+    options: [
+      'Do not share - faces are private',
+      'Share it',
+      'Send many photos',
+      'Tag friends too',
+    ],
     correct: 0,
   },
   {

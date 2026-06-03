@@ -19,6 +19,10 @@ describe('quizData banks', () => {
       });
     });
   });
+
+  it('bias bank is fully ported (>= 50 questions)', () => {
+    expect(quizData.bias.length).toBeGreaterThanOrEqual(50);
+  });
 });
 
 describe('pickN + toChoices', () => {

@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import type { Flyer as FlyerData } from '../level/types';
 import type { Solid } from '../level/types';
-import { PLAYER_W, PLAYER_H } from '../constants';
+import { PLAYER_H } from '../constants';
 
 export class Flyer {
   readonly data: FlyerData;

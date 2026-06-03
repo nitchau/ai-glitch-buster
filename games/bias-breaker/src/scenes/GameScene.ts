@@ -23,10 +23,9 @@ import {
   TORTOISE_RESPAWN_MIN,
   TORTOISE_RESPAWN_MAX,
   TORTOISE_STOMP_POINTS,
-  STAR_TIME_GOLD,
-  STAR_TIME_SILVER,
 } from '../constants';
 import { buildLevel, buildFlyers } from '../level/buildLevel';
+import { timeToStars } from '../scoring';
 import type { Level, Section } from '../level/types';
 import { Player, type PlayerKeys } from '../entities/Player';
 import { Flyer } from '../entities/Flyer';
@@ -498,7 +497,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.time.delayedCall(900, () => {
       const finalSec = Math.floor(this.state.timeMs / 1000);
-      const stars = finalSec <= STAR_TIME_GOLD ? 3 : finalSec <= STAR_TIME_SILVER ? 2 : 1;
+      const stars = timeToStars(finalSec);
       this.scene.start('CelebrationScene', {
         stars,
         time: finalSec,

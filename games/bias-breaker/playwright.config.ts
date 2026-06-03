@@ -13,7 +13,8 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm dev',
-    url: 'http://localhost:5173',
+    // Vite serves the app under the base path, so poll there for readiness.
+    url: 'http://localhost:5173/bias-breaker/',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },
