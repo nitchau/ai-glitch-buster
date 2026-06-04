@@ -584,7 +584,8 @@
                     100% { background-position: 0% 50%; }
                 }
             </style>
-            <button id="gg-launch-button" class="gg-launch" type="button">🎮 Play Glitch Guardians</button>
+            <!-- TODO(deploy): set href to the real Vercel URL after the first deploy (org-repo push currently blocked). -->
+            <a id="gg-launch-button" class="gg-launch" href="https://glitch-guardians.vercel.app/" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">🎮 Play Glitch Guardians</a>
         </div>
 
         <!-- Home Screen -->
@@ -3520,23 +3521,8 @@
         };
     </script>
 
-    <!-- Glitch Guardians game module -->
-    <link rel="stylesheet" href="GAME/glitch-guardians.css">
-    <div id="gg-root" hidden></div>
-    <script src="GAME/state.js"></script>
-    <script src="GAME/screens/onboarding.js"></script>
-    <script src="GAME/screens/map.js"></script>
-    <script src="GAME/screens/island-intro.js"></script>
-    <!-- Phase 2: Bias Breaker -->
-    <script src="GAME/screens/bias-breaker-questions.js"></script>
-    <script src="GAME/screens/bias-breaker-avatar.js"></script>
-    <script src="GAME/screens/bias-breaker-boss.js"></script>
-    <script src="GAME/screens/bias-breaker-celebration.js"></script>
-    <script src="GAME/screens/bias-breaker.js"></script>
-    <!-- Phase 3: Bad-Habit Harbor -->
-    <script src="GAME/screens/habit-harbor-questions.js"></script>
-    <script src="GAME/screens/habit-harbor-maze.js"></script>
-    <script src="GAME/screens/habit-harbor.js"></script>
-    <script src="GAME/glitch-guardians.js"></script>
+    <!-- Glitch Guardians is now the standalone Phaser games (the "Play Glitch Guardians"
+         link above opens the deployed Vercel app). The legacy in-page GAME/ scripts were
+         removed in the Phase 4 cutover — that code now lives under legacy/GAME/. -->
 </body>
 </html>

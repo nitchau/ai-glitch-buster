@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glitch Guardians</title>
+    <style>
+      :root {
+        --bg: #0a0820;
+        --card: #14224a;
+        --card2: #0e1a3a;
+        --green: #43e97b;
+        --cyan: #38f9d7;
+        --ink: #cfeefe;
+        --muted: #7e8bb0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 50% -10%, #1a1247 0%, var(--bg) 60%);
+        color: var(--ink);
+        font-family: 'Trebuchet MS', system-ui, sans-serif;
+        padding: 2rem 1rem 3rem;
+      }
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      h1 {
+        font-size: clamp(2rem, 6vw, 3.2rem);
+        margin: 0.2em 0 0;
+        color: var(--green);
+        letter-spacing: 0.5px;
+        text-shadow: 0 2px 0 #06351f, 0 0 24px rgba(67, 233, 123, 0.35);
+      }
+      .sub {
+        opacity: 0.85;
+        font-size: clamp(1rem, 3vw, 1.25rem);
+        margin-top: 0.4em;
+      }
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+      .card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        text-decoration: none;
+        color: inherit;
+        background: linear-gradient(160deg, var(--card), var(--card2));
+        border: 2px solid #2a3a66;
+        border-radius: 18px;
+        padding: 1rem 1.1rem;
+        transition:
+          transform 0.12s ease,
+          border-color 0.12s ease,
+          box-shadow 0.12s ease;
+      }
+      .card.play {
+        border-color: var(--green);
+        box-shadow: 0 6px 24px rgba(67, 233, 123, 0.12);
+        cursor: pointer;
+      }
+      .card.play:hover {
+        transform: translateY(-3px);
+        border-color: var(--cyan);
+        box-shadow: 0 10px 30px rgba(56, 249, 215, 0.22);
+      }
+      .card.locked {
+        opacity: 0.6;
+        filter: grayscale(0.3);
+      }
+      .icon {
+        font-size: 2.4rem;
+        line-height: 1;
+        width: 2.8rem;
+        text-align: center;
+        flex: 0 0 auto;
+      }
+      .meta {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .name {
+        font-weight: 800;
+        font-size: 1.15rem;
+      }
+      .badge {
+        font-size: 0.92rem;
+        margin-top: 0.2em;
+        color: var(--muted);
+      }
+      .badge.go {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .badge.done {
+        color: var(--cyan);
+      }
+      .stars {
+        letter-spacing: 2px;
+      }
+      footer {
+        text-align: center;
+        margin-top: 2rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div style="font-size: 2.6rem">🛡️</div>
+        <h1>Glitch Guardians</h1>
+        <div class="sub">Pick an island and become an AI Safety hero!</div>
+      </header>
+      <div class="grid" id="islands"></div>
+      <footer>Your progress is saved on this device. ⭐ = stars earned.</footer>
+    </div>
+    <script>
+      // The five islands, in ISLANDS order. Only built games are playable; the rest
+      // show "coming soon". Unlock/clear/stars come from localStorage.gg.profile,
+      // which the games write on this same Vercel origin.
+      var ISLANDS = [
+        { id: 'bias-breaker', name: 'Bias Breaker', icon: '⚖️', built: true },
+        { id: 'habit-harbor', name: 'Bad-Habit Harbor', icon: '🌊', built: true },
+        { id: 'privacy-vaults', name: 'Privacy Vault', icon: '🔐', built: false },
+        { id: 'reality-tower', name: 'Hallucination Tower', icon: '🗼', built: false },
+        { id: 'the-core', name: 'The Core', icon: '💥', built: false },
+      ];
+
+      function loadProfile() {
+        try {
+          var raw = localStorage.getItem('gg.profile');
+          if (raw) return JSON.parse(raw);
+        } catch (e) {
+          /* storage blocked / corrupt → fall through to defaults */
+        }
+        return null;
+      }
+
+      var profile = loadProfile();
+
+      // No profile → only the first island is open (mirrors @gg/shared blankProgress).
+      function stateFor(island) {
+        var p = profile && profile.progress ? profile.progress[island.id] : null;
+        return {
+          unlocked: p ? !!p.unlocked : island.id === 'bias-breaker',
+          cleared: p ? !!p.cleared : false,
+          stars: p && p.stars ? p.stars : 0,
+        };
+      }
+
+      function starStr(n) {
+        n = Math.max(0, Math.min(3, n));
+        return '⭐'.repeat(n) + '☆'.repeat(3 - n);
+      }
+
+      var host = document.getElementById('islands');
+      ISLANDS.forEach(function (island) {
+        var s = stateFor(island);
+        var playable = island.built && s.unlocked;
+        var el = document.createElement(playable ? 'a' : 'div');
+        el.className = 'card ' + (playable ? 'play' : 'locked');
+        if (playable) el.href = '/' + island.id + '/';
+
+        var badge, cls;
+        if (!island.built) {
+          badge = '🔒 Coming soon';
+          cls = '';
+        } else if (!s.unlocked) {
+          badge = '🔒 Locked';
+          cls = '';
+        } else if (s.cleared) {
+          badge = 'Cleared · <span class="stars">' + starStr(s.stars) + '</span> · Play again';
+          cls = 'done';
+        } else {
+          badge = '▶ Play';
+          cls = 'go';
+        }
+
+        el.innerHTML =
+          '<div class="icon">' +
+          island.icon +
+          '</div><div class="meta"><div class="name">' +
+          island.name +
+          '</div><div class="badge ' +
+          cls +
+          '">' +
+          badge +
+          '</div></div>';
+        host.appendChild(el);
+      });
+    </script>
+  </body>
+</html>

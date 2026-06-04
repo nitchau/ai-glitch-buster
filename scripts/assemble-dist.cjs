@@ -29,14 +29,8 @@ for (const id of GAMES) {
   console.log(`copied games/${id}/dist -> dist/${id}/`);
 }
 
-// A tiny placeholder index that links to each game. The real Datapolis landing
-// page lands in Phase 4 (main-app link cutover).
-const links = GAMES.map((id) => `<li><a href="/${id}/">${id}</a></li>`).join('');
-fs.writeFileSync(
-  path.join(out, 'index.html'),
-  `<!doctype html><meta charset="utf-8"><title>Glitch Guardians</title>` +
-    `<style>body{background:#0a0820;color:#cfeefe;font-family:system-ui;padding:2rem}` +
-    `a{color:#43e97b}</style><h1>Glitch Guardians</h1><ul>${links}</ul>\n`
-);
-console.log('wrote dist/index.html (placeholder landing)');
+// Ship the all-games landing page (five islands + unlock state from gg.profile)
+// as the Vercel root. It's a static file — copy it verbatim.
+fs.copyFileSync(path.join(root, 'landing', 'index.html'), path.join(out, 'index.html'));
+console.log('copied landing/index.html -> dist/index.html');
 console.log('assembled dist/ for:', GAMES.join(', '));
