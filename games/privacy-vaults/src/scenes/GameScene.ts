@@ -1,9 +1,15 @@
-// The Tetris scene for the Privacy Vault island. Milestone B adds the quiz gate:
-// every piece spawns LOCKED and drifts down slowly (holding above the question tray
-// so it stays visible) while a privacy question shows. Answer right -> you take
-// control of that piece (normal gravity + move/rotate/drop). Answer wrong -> it
-// finishes falling on autopilot, no control, and the next piece brings a new
-// question. Gentle: no lives, no game-over. The win flow + celebration land in C.
+// The Tetris scene for the Privacy Vault island.
+//
+// Layout: a light board on the LEFT (fully visible top-to-bottom) and a white panel
+// on the RIGHT holding NEXT / progress / status and — swapped by phase — either the
+// privacy question (quiz) or the touch controls (play).
+//
+// Quiz gate: every piece spawns LOCKED and drifts down slowly while a privacy
+// question shows on the side. Answer right -> you take control of that piece. Answer
+// wrong -> it finishes falling on autopilot. DON'T answer in time -> it just lands on
+// the stack and the next question comes (no waiting). Clear SECURE_GOAL (8) correct
+// answers -> you win the level: Hallucination Tower unlocks, and you can keep going
+// at a faster level. Gentle throughout: no lives, no game-over.
 
 import Phaser from 'phaser';
 import {
@@ -14,19 +20,23 @@ import {
   BOARD_Y,
   BOARD_W,
   BOARD_H,
-  RAIL_X,
-  RAIL_W,
+  PANEL_X,
+  PANEL_W,
+  PANEL_H,
   RENDER_SCALE,
   TEXT_RES,
   COLOR,
   PIECE_COLORS,
-  LINES_TO_WIN,
-  GRAVITY_MS,
-  LOCKED_GRAVITY_MS,
+  SECURE_GOAL,
+  BASE_GRAVITY_MS,
+  BASE_LOCKED_MS,
   SOFT_DROP_MS,
   LOCK_DELAY_MS,
   DAS_MS,
   ARR_MS,
+  SPEEDUP,
+  MIN_GRAVITY_MS,
+  MIN_LOCKED_MS,
 } from '../constants';
 import {
   COLS,
@@ -47,21 +57,21 @@ import {
   type PieceId,
 } from '../tetris';
 import { QuizCard, type Choice } from '../ui/QuizCard';
-import { pickN, type Question } from '@gg/shared';
+import { pickN, markIslandCleared, load, save, newProfile, type Question } from '@gg/shared';
 
 declare const __TEST_SEAM__: boolean;
 
 type KeyName = 'left' | 'right' | 'up' | 'down' | 'A' | 'D' | 'W' | 'S' | 'X' | 'Z' | 'SPACE';
 type Keys = Record<KeyName, Phaser.Input.Keyboard.Key>;
 
-// 'quiz'      = locked, drifting + holding above the tray, question open, no control
-// 'play'      = unlocked, full control + normal gravity
-// 'autopilot' = wrong answer: locked, finishing its fall on its own, no control
-type Phase = 'quiz' | 'play' | 'autopilot';
+// quiz      = locked, drifting, question open, no control (lands on its own if ignored)
+// play      = unlocked, full control + normal gravity
+// autopilot = wrong answer: locked, finishing its fall, no control
+// won       = level cleared, win overlay up, everything frozen
+type Phase = 'quiz' | 'play' | 'autopilot' | 'won';
 
-// While a question is open the locked piece holds at this row so it never slides
-// behind the bottom tray (tray top = y 360; row 9 bottom = y 348).
-const QUIZ_HOLD_ROW = 9;
+const CXP = PANEL_X + PANEL_W / 2; // panel centre x
+const QUIZ_RECT = { x: PANEL_X + 18, y: 308, w: PANEL_W - 36, h: 410 };
 
 export class GameScene extends Phaser.Scene {
   private grid: Grid = emptyGrid();
@@ -73,11 +83,16 @@ export class GameScene extends Phaser.Scene {
   private qPool: Question[] = [];
   private card!: QuizCard;
 
-  private lines = 0;
+  private correctCount = 0;
+  private linesCleared = 0;
+  private level = 1;
+  private clearedOnce = false; // unlock the next island only on the first win
+
+  private gravityMs = BASE_GRAVITY_MS;
+  private lockedMs = BASE_LOCKED_MS;
+
   private timeMs = 0;
   private animFrame = 0;
-  private won = false;
-
   private gravAccum = 0;
   private lockAccum = 0;
   private hDir = 0;
@@ -92,17 +107,16 @@ export class GameScene extends Phaser.Scene {
   private gActive!: Phaser.GameObjects.Graphics;
   private gNext!: Phaser.GameObjects.Graphics;
   private gBar!: Phaser.GameObjects.Graphics;
-  private linesText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
   private lockIcon!: Phaser.GameObjects.Text;
+  private securedText!: Phaser.GameObjects.Text;
+  private linesText!: Phaser.GameObjects.Text;
+  private levelText!: Phaser.GameObjects.Text;
+  private statusText!: Phaser.GameObjects.Text;
+  private controlsGroup!: Phaser.GameObjects.Container;
+  private winOverlay: Phaser.GameObjects.Container | null = null;
   private msg: Phaser.GameObjects.Container | null = null;
 
-  // rail sub-layout (set in buildRail)
-  private cxR = 0;
-  private nbX = 0;
-  private nbY = 0;
-  private nbW = 0;
-  private nbH = 0;
+  // progress-bar geometry (set in buildPanel)
   private barX = 0;
   private barY = 0;
   private barW = 0;
@@ -118,13 +132,20 @@ export class GameScene extends Phaser.Scene {
     } catch {
       /* ignore */
     }
+    // Ensure a profile exists so a win PERSISTS (and the map lights up) even if the
+    // game was opened directly, without going through the app's onboarding first.
+    try {
+      if (!load()) save(newProfile('Guardian', 'explorer'));
+    } catch {
+      /* ignore */
+    }
 
     this.cameras.main.setBackgroundColor('#e7edf9');
     this.cameras.main.setZoom(RENDER_SCALE);
     this.cameras.main.centerOn(CANVAS_W / 2, CANVAS_H / 2);
 
     this.buildBoard();
-    this.buildRail();
+    this.buildPanel();
     this.buildControls();
 
     this.gStack = this.add.graphics().setDepth(5);
@@ -147,7 +168,7 @@ export class GameScene extends Phaser.Scene {
     }) as Keys;
 
     this.nextId = this.bag.next();
-    this.spawnNext(); // first piece -> opens the first question
+    this.spawnNext(); // first piece -> first question
 
     this.redrawStack();
     this.redrawActive();
@@ -157,12 +178,14 @@ export class GameScene extends Phaser.Scene {
       const w = window as unknown as { __GAME_STATE__: () => unknown; __SCENE__: GameScene };
       w.__SCENE__ = this;
       w.__GAME_STATE__ = () => ({
-        lines: this.lines,
         phase: this.phase,
+        correct: this.correctCount,
+        goal: SECURE_GOAL,
+        lines: this.linesCleared,
+        level: this.level,
         pieceId: this.piece.id,
         x: this.piece.x,
         y: this.piece.y,
-        won: this.won,
         filled: this.grid.reduce((n, row) => n + row.filter((v) => v !== 0).length, 0),
       });
     }
@@ -170,10 +193,8 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.animFrame++;
-    if (this.won) return;
-    // Clamp first-frame / tab-switch delta spikes so a piece can never slam several
-    // cells in one frame (keeps the drop calm and deterministic).
-    const dt = Math.min(delta, 100);
+    if (this.phase === 'won') return;
+    const dt = Math.min(delta, 100); // clamp load / tab-switch spikes
     this.timeMs += dt;
 
     const playing = this.phase === 'play';
@@ -188,7 +209,6 @@ export class GameScene extends Phaser.Scene {
     this.pendRotate = false;
     this.pendHard = false;
 
-    // Controls only respond once the piece is unlocked.
     if (playing) {
       if (rotCW) this.tryRotate(1);
       if (rotCCW) this.tryRotate(-1);
@@ -239,12 +259,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private pieceMaxRow(): number {
-    let mx = -99;
-    for (const { r } of cells(this.piece)) if (r > mx) mx = r;
-    return mx;
-  }
-
   private stepGravity(dt: number, soft: boolean): void {
     if (this.phase === 'play') {
       const grounded = move(this.grid, this.piece, 0, 1) === null;
@@ -255,7 +269,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.lockAccum = 0;
       this.gravAccum += dt;
-      const iv = soft ? SOFT_DROP_MS : GRAVITY_MS;
+      const iv = soft ? SOFT_DROP_MS : this.gravityMs;
       while (this.gravAccum >= iv) {
         this.gravAccum -= iv;
         const m = move(this.grid, this.piece, 0, 1);
@@ -268,20 +282,18 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // quiz / autopilot: slow self-drift, no control.
+    // quiz / autopilot: slow self-drift, no control. NO hold — if it reaches the
+    // stack it just lands (the player was too slow / answered wrong).
     this.gravAccum += dt;
-    while (this.gravAccum >= LOCKED_GRAVITY_MS) {
-      this.gravAccum -= LOCKED_GRAVITY_MS;
-      if (this.phase === 'quiz' && this.pieceMaxRow() >= QUIZ_HOLD_ROW) {
-        this.gravAccum = 0; // hold above the tray until the question is answered
-        break;
-      }
+    while (this.gravAccum >= this.lockedMs) {
+      this.gravAccum -= this.lockedMs;
       const m = move(this.grid, this.piece, 0, 1);
       if (m) {
         this.piece = m;
       } else {
         this.gravAccum = 0;
-        if (this.phase === 'autopilot') this.lockPiece(); // it landed on its own
+        if (this.phase === 'quiz') this.flashMessage('⏰ Too slow — it landed!', 'warn');
+        this.lockPiece(); // lands, places, next piece + question
         break;
       }
     }
@@ -292,7 +304,7 @@ export class GameScene extends Phaser.Scene {
     const res = clearLines(this.grid);
     this.grid = res.grid;
     if (res.cleared > 0) {
-      this.lines += res.cleared;
+      this.linesCleared += res.cleared;
       this.flashBoard(0xffffff);
     }
     this.gravAccum = 0;
@@ -316,35 +328,77 @@ export class GameScene extends Phaser.Scene {
 
   private beginQuiz(): void {
     this.phase = 'quiz';
+    this.controlsGroup.setVisible(false);
     this.updateStatus();
-    this.card.open(this.nextQuestion(), (ch) => this.onAnswer(ch));
+    this.card.open(this.nextQuestion(), QUIZ_RECT, (ch) => this.onAnswer(ch));
   }
 
   private nextQuestion(): Question {
-    if (!this.qPool.length) this.qPool = pickN('privacy', 8);
+    if (!this.qPool.length) this.qPool = pickN('privacy', 12);
     return this.qPool.pop() as Question;
   }
 
   private onAnswer(ch: Choice): void {
     this.card.close();
     if (ch.isCorrect) {
+      this.correctCount++;
+      this.updateHud();
+      if (this.correctCount >= SECURE_GOAL) {
+        this.winLevel();
+        return;
+      }
       this.phase = 'play';
       this.gravAccum = 0;
       this.lockAccum = 0;
+      this.controlsGroup.setVisible(true);
       this.flashMessage('🔓  Your move!', 'good');
       this.flashBoard(0xdaf3e0);
     } else {
       this.phase = 'autopilot';
+      this.controlsGroup.setVisible(false);
       this.flashMessage('🤖  Autopilot — answer the next one!', 'warn');
     }
     this.updateStatus();
   }
 
-  // Gentle, no game-over: tidy the vault and carry on (line progress is kept).
+  // Gentle, no game-over: tidy the vault and carry on (progress is kept).
   private topOut(): void {
     this.grid = emptyGrid();
     this.redrawStack();
     this.flashBoard(0xfff0b8);
+  }
+
+  // ---- win + levels --------------------------------------------------------
+
+  private winLevel(): void {
+    this.phase = 'won';
+    this.card.close();
+    this.controlsGroup.setVisible(false);
+    this.lockIcon.setVisible(false);
+    if (!this.clearedOnce) {
+      this.clearedOnce = true;
+      try {
+        markIslandCleared('privacy-vaults', 3); // unlocks reality-tower (Hallucination Tower)
+      } catch {
+        /* ignore */
+      }
+    }
+    this.showWinOverlay();
+  }
+
+  private nextLevel(): void {
+    this.level++;
+    this.gravityMs = Math.max(MIN_GRAVITY_MS, BASE_GRAVITY_MS * Math.pow(SPEEDUP, this.level - 1));
+    this.lockedMs = Math.max(MIN_LOCKED_MS, BASE_LOCKED_MS * Math.pow(SPEEDUP, this.level - 1));
+    this.correctCount = 0;
+    this.grid = emptyGrid();
+    this.redrawStack();
+    this.winOverlay?.destroy(true);
+    this.winOverlay = null;
+    this.updateHud();
+    this.spawnNext(); // back to quiz with a fresh question
+    this.redrawActive();
+    this.updateLockIcon();
   }
 
   // ---- rendering -----------------------------------------------------------
@@ -354,11 +408,11 @@ export class GameScene extends Phaser.Scene {
     const rad = size * 0.18;
     const i = size * 0.06;
     g.fillStyle(tc.edge, 0.3 * alpha);
-    g.fillRoundedRect(x + i, y + i * 1.6, size - 2 * i, size - i * 1.6, rad); // soft drop shadow
+    g.fillRoundedRect(x + i, y + i * 1.6, size - 2 * i, size - i * 1.6, rad);
     g.fillStyle(tc.fill, alpha);
     g.fillRoundedRect(x + i, y + i, size - 2 * i, size - 2 * i, rad);
     g.fillStyle(tc.light, 0.85 * alpha);
-    g.fillRoundedRect(x + size * 0.16, y + i * 1.7, size * 0.68, size * 0.26, rad * 0.7); // top highlight
+    g.fillRoundedRect(x + size * 0.16, y + i * 1.7, size * 0.68, size * 0.26, rad * 0.7);
   }
 
   private ghostTile(g: Phaser.GameObjects.Graphics, c: number, r: number, id: number): void {
@@ -384,6 +438,7 @@ export class GameScene extends Phaser.Scene {
 
   private redrawActive(): void {
     this.gActive.clear();
+    if (this.phase === 'won') return;
     const id = COLOR_INDEX[this.piece.id];
     if (this.phase === 'play') {
       for (const { c, r } of cells(dropPosition(this.grid, this.piece))) {
@@ -396,7 +451,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateLockIcon(): void {
-    if (this.phase === 'play') {
+    if (this.phase === 'play' || this.phase === 'won') {
       this.lockIcon.setVisible(false);
       return;
     }
@@ -428,9 +483,11 @@ export class GameScene extends Phaser.Scene {
     const maxR = Math.max(...csR);
     const w = maxC - minC + 1;
     const h = maxR - minR + 1;
-    const ps = 22;
-    const ox = this.nbX + (this.nbW - w * ps) / 2 - minC * ps;
-    const oy = this.nbY + (this.nbH - h * ps) / 2 - minR * ps;
+    const ps = 19;
+    const boxCx = CXP;
+    const boxCy = 122;
+    const ox = boxCx - (w * ps) / 2 - minC * ps;
+    const oy = boxCy - (h * ps) / 2 - minR * ps;
     const id = COLOR_INDEX[this.nextId];
     for (const { c, r } of cs) this.tilePx(this.gNext, ox + c * ps, oy + r * ps, ps, id);
   }
@@ -446,7 +503,7 @@ export class GameScene extends Phaser.Scene {
     this.msg?.destroy(true);
     const x = BOARD_X + BOARD_W / 2;
     const y = BOARD_Y + 26;
-    const accent = kind === 'good' ? 0x43c06d : 0xef9a6a;
+    const accent = kind === 'good' ? COLOR.good : COLOR.warn;
     const t = this.add
       .text(0, 0, text, { fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#3b456a', resolution: TEXT_RES })
       .setOrigin(0.5);
@@ -476,16 +533,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateStatus(): void {
-    const label = this.phase === 'play' ? '🔓 Your move!' : this.phase === 'autopilot' ? '🤖 Autopilot…' : '🔒 Answer to steer';
+    const label =
+      this.phase === 'play' ? '🔓 Your move!' : this.phase === 'autopilot' ? '🤖 Autopilot…' : '🔒 Answer to steer';
     this.statusText.setText(label);
   }
 
   private updateHud(): void {
-    this.linesText.setText(`${this.lines} / ${LINES_TO_WIN}`);
+    this.securedText.setText(`${this.correctCount} / ${SECURE_GOAL}`);
+    this.linesText.setText(`Lines cleared: ${this.linesCleared}`);
+    this.levelText.setText(`⚡ Level ${this.level}`);
     this.gBar.clear();
     this.gBar.fillStyle(COLOR.boardInner, 1);
     this.gBar.fillRoundedRect(this.barX, this.barY, this.barW, this.barH, this.barH / 2);
-    const frac = Math.min(1, this.lines / LINES_TO_WIN);
+    const frac = Math.min(1, this.correctCount / SECURE_GOAL);
     if (frac > 0) {
       this.gBar.fillStyle(COLOR.accent, 1);
       this.gBar.fillRoundedRect(this.barX, this.barY, Math.max(this.barH, this.barW * frac), this.barH, this.barH / 2);
@@ -511,37 +571,44 @@ export class GameScene extends Phaser.Scene {
     for (let r = 0; r <= ROWS; r++) g.lineBetween(BOARD_X, BOARD_Y + r * CELL, BOARD_X + BOARD_W, BOARD_Y + r * CELL);
   }
 
-  private buildRail(): void {
-    this.cxR = RAIL_X + (RAIL_W - 4) / 2;
+  private buildPanel(): void {
     const g = this.add.graphics().setDepth(2);
     g.fillStyle(COLOR.boardShadow, 0.4);
-    g.fillRoundedRect(RAIL_X + 2, BOARD_Y + 2, RAIL_W - 4, BOARD_H + 12, 16);
+    g.fillRoundedRect(PANEL_X + 3, BOARD_Y + 3, PANEL_W, PANEL_H + 6, 18);
     g.fillStyle(COLOR.rail, 1);
-    g.fillRoundedRect(RAIL_X, BOARD_Y - 8, RAIL_W - 4, BOARD_H + 16, 16);
+    g.fillRoundedRect(PANEL_X, BOARD_Y, PANEL_W, PANEL_H, 18);
     g.lineStyle(2, COLOR.railEdge, 1);
-    g.strokeRoundedRect(RAIL_X, BOARD_Y - 8, RAIL_W - 4, BOARD_H + 16, 16);
+    g.strokeRoundedRect(PANEL_X, BOARD_Y, PANEL_W, PANEL_H, 18);
 
-    this.nbW = 132;
-    this.nbH = 100;
-    this.nbX = this.cxR - this.nbW / 2;
-    this.nbY = BOARD_Y + 34;
-    g.fillStyle(COLOR.boardInner, 1);
-    g.fillRoundedRect(this.nbX, this.nbY, this.nbW, this.nbH, 12);
-    g.lineStyle(1.5, COLOR.railEdge, 1);
-    g.strokeRoundedRect(this.nbX, this.nbY, this.nbW, this.nbH, 12);
-
-    this.add
-      .text(this.cxR, this.nbY - 6, 'NEXT', { fontFamily: 'Arial', fontSize: '14px', color: '#8b96b4', resolution: TEXT_RES })
-      .setOrigin(0.5, 1)
-      .setDepth(12);
-
-    const linesY = this.nbY + this.nbH + 26;
-    this.add
-      .text(this.cxR, linesY, 'LINES CLEARED', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+    // level pill
+    this.levelText = this.add
+      .text(CXP, BOARD_Y + 26, '⚡ Level 1', {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '16px',
+        color: '#6f8cff',
+        resolution: TEXT_RES,
+      })
       .setOrigin(0.5)
       .setDepth(12);
-    this.linesText = this.add
-      .text(this.cxR, linesY + 30, '0 / 8', {
+
+    // NEXT box
+    this.add
+      .text(CXP, BOARD_Y + 52, 'NEXT', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(12);
+    g.fillStyle(COLOR.boardInner, 1);
+    g.fillRoundedRect(CXP - 42, 96, 84, 84, 12);
+    g.lineStyle(1.5, COLOR.railEdge, 1);
+    g.strokeRoundedRect(CXP - 42, 96, 84, 84, 12);
+    this.gNext = this.add.graphics().setDepth(11);
+
+    // SECURED goal
+    this.add
+      .text(CXP, 200, '🔒 PRIVACY SECURED', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(12);
+    this.securedText = this.add
+      .text(CXP, 230, '0 / 8', {
         fontFamily: 'Arial Black, Arial, sans-serif',
         fontSize: '30px',
         color: '#3b456a',
@@ -550,32 +617,43 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(12);
 
-    this.barX = this.nbX;
-    this.barY = linesY + 56;
-    this.barW = this.nbW;
+    this.barX = PANEL_X + 28;
+    this.barY = 258;
+    this.barW = PANEL_W - 56;
     this.barH = 12;
-    this.gNext = this.add.graphics().setDepth(11);
     this.gBar = this.add.graphics().setDepth(11);
 
+    this.linesText = this.add
+      .text(CXP, 280, 'Lines cleared: 0', { fontFamily: 'Arial', fontSize: '12px', color: '#8b96b4', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(12);
+
     this.statusText = this.add
-      .text(this.cxR, this.barY + 34, '', { fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#6f8cff', resolution: TEXT_RES })
+      .text(CXP, QUIZ_RECT.y - 18, '', { fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#6f8cff', resolution: TEXT_RES })
       .setOrigin(0.5)
       .setDepth(12);
   }
 
-  // ---- touch controls ------------------------------------------------------
+  // ---- touch controls (shown in the panel during the play phase) -----------
 
   private buildControls(): void {
-    const cx = this.cxR;
-    const rotY = CANVAS_H - 214;
-    const rowY = CANVAS_H - 152;
-    const dropY = CANVAS_H - 92;
+    this.controlsGroup = this.add.container(0, 0).setDepth(20).setVisible(false);
+    const cx = CXP;
+    const rotY = 372;
+    const rowY = 444;
+    const dropY = 516;
 
-    this.softButton(cx, rotY, 64, 48, '⟳', () => (this.pendRotate = true), true);
-    this.softButton(cx - 50, rowY, 48, 48, '◄', (v) => (this.dpad.left = v));
-    this.softButton(cx, rowY, 48, 48, '▼', (v) => (this.dpad.down = v));
-    this.softButton(cx + 50, rowY, 48, 48, '►', (v) => (this.dpad.right = v));
-    this.softButton(cx, dropY, 148, 44, '⤓  DROP', () => (this.pendHard = true), true);
+    this.softButton(cx, rotY, 70, 52, '⟳', () => (this.pendRotate = true), true);
+    this.softButton(cx - 58, rowY, 52, 52, '◄', (v) => (this.dpad.left = v));
+    this.softButton(cx, rowY, 52, 52, '▼', (v) => (this.dpad.down = v));
+    this.softButton(cx + 58, rowY, 52, 52, '►', (v) => (this.dpad.right = v));
+    this.softButton(cx, dropY, 178, 46, '⤓  DROP', () => (this.pendHard = true), true);
+
+    this.controlsGroup.add(
+      this.add
+        .text(cx, dropY + 48, 'Place the block!', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+        .setOrigin(0.5),
+    );
   }
 
   private softButton(
@@ -587,18 +665,17 @@ export class GameScene extends Phaser.Scene {
     set: (v: boolean) => void,
     oneShot = false,
   ): void {
-    const g = this.add.graphics().setDepth(20);
+    const g = this.add.graphics();
     g.fillStyle(0xffffff, 1);
     g.fillRoundedRect(cx - w / 2, cy - h / 2, w, h, 11);
     g.lineStyle(2, COLOR.railEdge, 1);
     g.strokeRoundedRect(cx - w / 2, cy - h / 2, w, h, 11);
     const txt = this.add
       .text(cx, cy, label, { fontFamily: 'Arial', fontSize: `${Math.round(h * 0.42)}px`, color: '#5b67a6', resolution: TEXT_RES })
-      .setOrigin(0.5)
-      .setDepth(21);
-    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(22);
+      .setOrigin(0.5);
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
-      set(true);
+      if (this.phase === 'play') set(true);
       txt.setScale(0.9);
     });
     zone.on('pointerup', () => {
@@ -609,5 +686,122 @@ export class GameScene extends Phaser.Scene {
       if (!oneShot) set(false);
       txt.setScale(1);
     });
+    this.controlsGroup.add([g, txt, zone]);
+  }
+
+  // ---- win overlay ---------------------------------------------------------
+
+  private showWinOverlay(): void {
+    const cont = this.add.container(0, 0).setDepth(400);
+    cont.add(this.add.rectangle(CANVAS_W / 2, CANVAS_H / 2, CANVAS_W, CANVAS_H, 0x1b2547, 0.34).setInteractive());
+
+    const cw = 470;
+    const ch = 310;
+    const cx = CANVAS_W / 2;
+    const cy = CANVAS_H / 2;
+    const cardX = cx - cw / 2;
+    const cardY = cy - ch / 2;
+
+    const g = this.add.graphics();
+    g.fillStyle(COLOR.boardShadow, 0.5);
+    g.fillRoundedRect(cardX, cardY + 10, cw, ch, 22);
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(cardX, cardY, cw, ch, 22);
+    g.lineStyle(2, COLOR.railEdge, 1);
+    g.strokeRoundedRect(cardX, cardY, cw, ch, 22);
+    cont.add(g);
+
+    // confetti
+    const confettiColors = [0x7ecbd6, 0xf2cf6b, 0xb69ae0, 0x8fcf9b, 0xef9a9a, 0x8aa9e6, 0xf0b27a];
+    for (let i = 0; i < 16; i++) {
+      const px = cardX + 24 + ((i * 53) % (cw - 48));
+      const col = confettiColors[i % confettiColors.length]!;
+      const piece = this.add.rectangle(px, cardY + 6, 9, 13, col).setAngle((i * 37) % 360);
+      cont.add(piece);
+      this.tweens.add({
+        targets: piece,
+        y: cardY + ch - 16,
+        angle: `+=${180 + i * 18}`,
+        duration: 1100 + (i % 5) * 220,
+        ease: 'Quad.in',
+        repeat: -1,
+        delay: i * 40,
+      });
+    }
+
+    cont.add(
+      this.add
+        .text(cx, cardY + 56, '🎉  You did it!', {
+          fontFamily: 'Arial Black, sans-serif',
+          fontSize: '30px',
+          color: '#3b456a',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5),
+    );
+    cont.add(
+      this.add
+        .text(cx, cardY + 100, `You secured ${SECURE_GOAL} privacy facts!`, {
+          fontFamily: 'Arial',
+          fontSize: '17px',
+          color: '#5b67a6',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5),
+    );
+    cont.add(
+      this.add
+        .text(cx, cardY + 134, '🗼 Hallucination Tower unlocked!', {
+          fontFamily: 'Arial Black, sans-serif',
+          fontSize: '18px',
+          color: '#6f8cff',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5),
+    );
+
+    this.overlayButton(cont, cx, cardY + 196, 300, 50, `⚡  Keep going — Level ${this.level + 1}`, COLOR.accent, 0xffffff, () =>
+      this.nextLevel(),
+    );
+    this.overlayButton(cont, cx, cardY + 256, 300, 44, '🗺️  Back to Map', 0xffffff, COLOR.accent, () => {
+      window.location.href = '../';
+    });
+
+    cont.setScale(0.92).setAlpha(0.4);
+    this.tweens.add({ targets: cont, scale: 1, alpha: 1, duration: 200, ease: 'Back.out' });
+    this.winOverlay = cont;
+  }
+
+  private overlayButton(
+    parent: Phaser.GameObjects.Container,
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    label: string,
+    fill: number,
+    textColor: number,
+    onTap: () => void,
+  ): void {
+    const g = this.add.graphics();
+    const drawBtn = (f: number): void => {
+      g.clear();
+      g.fillStyle(f, 1);
+      g.fillRoundedRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+      if (f === 0xffffff) {
+        g.lineStyle(2, COLOR.accent, 1);
+        g.strokeRoundedRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+      }
+    };
+    drawBtn(fill);
+    const hex = `#${textColor.toString(16).padStart(6, '0')}`;
+    const txt = this.add
+      .text(cx, cy, label, { fontFamily: 'Arial Black, sans-serif', fontSize: '17px', color: hex, resolution: TEXT_RES })
+      .setOrigin(0.5);
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true });
+    zone.on('pointerover', () => txt.setScale(1.04));
+    zone.on('pointerout', () => txt.setScale(1));
+    zone.on('pointerdown', () => onTap());
+    parent.add([g, txt, zone]);
   }
 }

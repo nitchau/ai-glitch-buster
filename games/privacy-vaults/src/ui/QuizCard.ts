@@ -1,13 +1,15 @@
-// Clean-modern question tray for the Privacy Vault Tetris. A light card that fades
-// up from the bottom while a piece is locked: a privacy question + four rounded
-// answer buttons (A/B/C/D) with hover and correct/wrong feedback. The scene owns the
-// game phase; this just renders the question and reports which choice was tapped.
+// Clean-modern question renderer for the Privacy Vault Tetris. Draws a privacy
+// question + four rounded A/B/C/D answer buttons INSIDE a given rect of the right-
+// hand panel (no board-covering scrim — the board stays fully visible so the locked
+// block is seen drifting + landing while you answer). The scene owns the game phase;
+// this just renders the question and reports which choice was tapped.
 
 import Phaser from 'phaser';
-import { CANVAS_W, CANVAS_H, TEXT_RES, COLOR } from '../constants';
+import { TEXT_RES, COLOR } from '../constants';
 import { toChoices, type Question } from '@gg/shared';
 
 export type Choice = { text: string; isCorrect: boolean };
+export type Rect = { x: number; y: number; w: number; h: number };
 
 const LETTERS = ['A', 'B', 'C', 'D'];
 
@@ -23,66 +25,39 @@ export class QuizCard {
     return this.container !== null;
   }
 
-  open(q: Question, onPick: (choice: Choice) => void): void {
+  open(q: Question, rect: Rect, onPick: (choice: Choice) => void): void {
     this.close();
     const s = this.scene;
-    const cardX = 18;
-    const cardW = CANVAS_W - 36;
-    const cardTop = 360;
-    const cardBottom = CANVAS_H - 16;
-    const cardH = cardBottom - cardTop;
-    const cx = CANVAS_W / 2;
+    const { x, y, w, h } = rect;
+    const cx = x + w / 2;
 
-    const c = s.add.container(0, 0).setDepth(300);
+    const c = s.add.container(0, 0).setDepth(200);
 
-    // Light scrim — focuses attention while keeping the board faintly visible.
-    c.add(s.add.rectangle(CANVAS_W / 2, CANVAS_H / 2, CANVAS_W, CANVAS_H, 0x1b2547, 0.16).setInteractive());
-
-    // Card: soft drop shadow + white panel + border.
-    const g = s.add.graphics();
-    g.fillStyle(COLOR.boardShadow, 0.5);
-    g.fillRoundedRect(cardX, cardTop + 8, cardW, cardH, 20);
-    g.fillStyle(0xffffff, 1);
-    g.fillRoundedRect(cardX, cardTop, cardW, cardH, 20);
-    g.lineStyle(2, COLOR.railEdge, 1);
-    g.strokeRoundedRect(cardX, cardTop, cardW, cardH, 20);
-    c.add(g);
-
+    // Question (wrapped) at the top of the rect.
     c.add(
       s.add
-        .text(cx, cardTop + 24, '🔒  Answer to take control', {
-          fontFamily: 'Arial',
-          fontSize: '15px',
-          color: '#8b96b4',
-          resolution: TEXT_RES,
-        })
-        .setOrigin(0.5),
-    );
-
-    c.add(
-      s.add
-        .text(cx, cardTop + 50, q.question, {
+        .text(cx, y, q.question, {
           fontFamily: 'Arial Black, Arial, sans-serif',
-          fontSize: '19px',
+          fontSize: '17px',
           color: '#3b456a',
           align: 'center',
-          wordWrap: { width: cardW - 56 },
+          wordWrap: { width: w - 8 },
           resolution: TEXT_RES,
         })
         .setOrigin(0.5, 0),
     );
 
-    // Four answer buttons, bottom-aligned inside the card.
+    // Four answer buttons fill the lower part of the rect.
     let picked = false;
     const choices = toChoices(q);
-    const bw = cardW - 44;
-    const bh = 44;
-    const stepY = bh + 10;
-    const lastY = cardBottom - 14 - bh / 2;
-    const startY = lastY - (choices.length - 1) * stepY;
+    const qReserve = 96; // space reserved for the question text
+    const gap = 11;
+    const bw = w;
+    const bh = Math.min(58, (h - qReserve - gap * (choices.length - 1)) / choices.length);
+    const top = y + qReserve;
 
     choices.forEach((ch, i) => {
-      const by = startY + i * stepY;
+      const by = top + i * (bh + gap) + bh / 2;
       const btn = s.add.container(0, 0);
       const pill = s.add.graphics();
       const draw = (fill: number, border: number): void => {
@@ -94,24 +69,24 @@ export class QuizCard {
       };
       draw(0xffffff, COLOR.railEdge);
 
-      const badgeX = cx - bw / 2 + 26;
+      const badgeX = cx - bw / 2 + 24;
       const badge = s.add.graphics();
       badge.fillStyle(COLOR.accent, 1);
-      badge.fillCircle(badgeX, by, 14);
+      badge.fillCircle(badgeX, by, 13);
       const badgeText = s.add
         .text(badgeX, by, LETTERS[i] ?? '?', {
           fontFamily: 'Arial Black, sans-serif',
-          fontSize: '15px',
+          fontSize: '14px',
           color: '#ffffff',
           resolution: TEXT_RES,
         })
         .setOrigin(0.5);
       const label = s.add
-        .text(badgeX + 26, by, ch.text, {
+        .text(badgeX + 22, by, ch.text, {
           fontFamily: 'Arial',
-          fontSize: '16px',
+          fontSize: '15px',
           color: '#3b456a',
-          wordWrap: { width: bw - 88 },
+          wordWrap: { width: bw - 72 },
           resolution: TEXT_RES,
         })
         .setOrigin(0, 0.5);
@@ -130,18 +105,16 @@ export class QuizCard {
         picked = true;
         if (ch.isCorrect) {
           draw(0xdaf3e0, 0x43c06d);
-          s.tweens.add({ targets: btn, scaleX: 1.02, scaleY: 1.02, duration: 110, yoyo: true });
         } else {
           draw(0xfcdfe1, 0xef9a9a);
-          s.tweens.add({ targets: btn, x: { from: -6, to: 0 }, duration: 80, repeat: 2, yoyo: true });
+          s.tweens.add({ targets: label, x: { from: badgeX + 17, to: badgeX + 22 }, duration: 70, repeat: 2, yoyo: true });
         }
-        s.time.delayedCall(240, () => onPick(ch));
+        s.time.delayedCall(220, () => onPick(ch));
       });
     });
 
     c.setAlpha(0);
-    c.y = 16;
-    s.tweens.add({ targets: c, alpha: 1, y: 0, duration: 160, ease: 'Quad.out' });
+    s.tweens.add({ targets: c, alpha: 1, duration: 140 });
     this.container = c;
   }
 

@@ -5,7 +5,7 @@
 // is unit-tested before a single pixel is drawn; GameScene is a thin renderer on top.
 
 export const COLS = 10;
-export const ROWS = 20;
+export const ROWS = 22;
 
 export type PieceId = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';
 export const PIECE_IDS: PieceId[] = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];

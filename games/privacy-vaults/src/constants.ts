@@ -1,40 +1,45 @@
-// Privacy Vault = an old-school Tetris. Clean-modern look: a light board, soft
-// drop-shadows, rounded pastel tiles. The grid model (COLS/ROWS) lives in tetris.ts;
-// here we own the on-screen layout, timing, palette, and the RENDER_SCALE supersample
-// + TEXT_RES crisp-text pattern shared across the islands.
+// Privacy Vault = an old-school Tetris with a quiz gate. Clean-modern look: a light
+// board on the LEFT and a white info/question panel on the RIGHT, so the falling
+// block is always fully visible (it drifts + lands in plain sight while you answer
+// on the side). The grid model (COLS/ROWS) lives in tetris.ts; here we own the
+// on-screen layout, per-level timing, palette, and the RENDER_SCALE supersample +
+// TEXT_RES crisp-text pattern shared across the islands.
 
 import { COLS, ROWS } from './tetris';
 
-// --- layout (logical px; the backing store is RENDER_SCALE× this) -------------
+// --- layout (logical px; backing store is RENDER_SCALE× this) -----------------
 export const CELL = 32;
 export const BOARD_W = COLS * CELL; // 320
-export const BOARD_H = ROWS * CELL; // 640
-export const PAD = 28; // outer margin
-export const RAIL_W = 172; // right-hand info/controls rail
+export const BOARD_H = ROWS * CELL; // 704 @ ROWS=22
 
-export const BOARD_X = PAD; // board top-left
+export const PAD = 26; // outer margin
+export const GAP = 24; // board <-> panel gap
+export const PANEL_W = 326; // right info/question/controls panel
+
+export const BOARD_X = PAD;
 export const BOARD_Y = PAD;
-export const RAIL_X = PAD + BOARD_W + PAD; // 376
+export const PANEL_X = PAD + BOARD_W + GAP; // 370
+export const PANEL_H = BOARD_H;
 
-export const CANVAS_W = PAD + BOARD_W + PAD + RAIL_W + PAD; // 576
-export const CANVAS_H = PAD + BOARD_H + PAD; // 696
+export const CANVAS_W = PAD + BOARD_W + GAP + PANEL_W + PAD; // 722
+export const CANVAS_H = PAD + BOARD_H + PAD; // 756
 
-// Supersample: backing store is RENDER_SCALE× the logical size; the camera zooms to
-// match so vector shapes (not just text) stay crisp when FIT-scaled to the screen.
 export const RENDER_SCALE = 2;
 
 // --- rules --------------------------------------------------------------------
-export const LINES_TO_WIN = 8;
+export const SECURE_GOAL = 8; // correct privacy answers to clear a level
 
-// --- timing (ms) --------------------------------------------------------------
-export const GRAVITY_MS = 700; // normal fall (one cell) when the piece is unlocked
-export const LOCKED_GRAVITY_MS = 1100; // slow drift while locked, waiting for an answer [Milestone B]
-export const SOFT_DROP_MS = 45; // fall speed while holding Down
+// --- timing (ms) — level-1 base; the scene scales by SPEEDUP each level --------
+export const BASE_GRAVITY_MS = 650; // normal fall (one cell) when unlocked
+export const BASE_LOCKED_MS = 950; // slow self-drift while a question is open
+export const SOFT_DROP_MS = 40; // fall speed while holding Down
 export const LOCK_DELAY_MS = 420; // grace once a piece can no longer fall
 export const DAS_MS = 150; // delay before a held Left/Right auto-repeats
 export const ARR_MS = 50; // auto-repeat interval thereafter
+export const SPEEDUP = 0.86; // multiply both gravities each new level (faster)
+export const MIN_GRAVITY_MS = 130; // speed floors
+export const MIN_LOCKED_MS = 430;
 
-// --- time-based stars (same tiers as the other islands) -----------------------
 export const STAR_TIME_GOLD = 90;
 export const STAR_TIME_SILVER = 120;
 
@@ -54,7 +59,9 @@ export const COLOR = {
   railEdge: 0xe2e8f5,
   textDark: 0x3b456a,
   textMute: 0x8b96b4,
-  accent: 0x6f8cff, // progress bar / highlights
+  accent: 0x6f8cff,
+  good: 0x43c06d,
+  warn: 0xef9a6a,
   ghostEdge: 0x9aa6c6,
 } as const;
 
