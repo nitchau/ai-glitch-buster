@@ -1,44 +1,92 @@
-// The vault scene. Milestone A = static render (floor/walls/cover/leaks/exit/entry)
-// + the Guardian with per-axis wall collision + the supersampled camera. Patrol
-// bots + vision cones (B), leak-seal quiz + win (C) arrive next.
+// The Tetris scene for the Privacy Vault island. Milestone A: a clean-modern,
+// fully-playable board — soft-shadowed rounded pastel tiles on a light panel, a
+// ghost-piece landing preview, a Next box, gravity + lock-delay + line-clear, and
+// keyboard / touch controls. The quiz gate (lock each piece until a privacy question
+// is answered) arrives in Milestone B; for now pieces are freely controllable.
 
 import Phaser from 'phaser';
 import {
   CANVAS_W,
   CANVAS_H,
   CELL,
-  COLS,
-  ROWS,
-  GUARDIAN_R,
-  SEAL_TOTAL,
-  COLOR,
+  BOARD_X,
+  BOARD_Y,
+  BOARD_W,
+  BOARD_H,
+  RAIL_X,
+  RAIL_W,
   RENDER_SCALE,
   TEXT_RES,
+  COLOR,
+  PIECE_COLORS,
+  LINES_TO_WIN,
+  GRAVITY_MS,
+  SOFT_DROP_MS,
+  LOCK_DELAY_MS,
+  DAS_MS,
+  ARR_MS,
 } from '../constants';
-import { buildVault, isWall, type VaultModel } from '../vault';
-import { Guardian, type Dir } from '../entities/Guardian';
+import {
+  COLS,
+  ROWS,
+  COLOR_INDEX,
+  emptyGrid,
+  spawn,
+  cells,
+  collides,
+  merge,
+  clearLines,
+  move,
+  rotate,
+  dropPosition,
+  SevenBag,
+  type Grid,
+  type Piece,
+  type PieceId,
+} from '../tetris';
 
 declare const __TEST_SEAM__: boolean;
 
-type KeyName = 'left' | 'right' | 'up' | 'down' | 'A' | 'D' | 'W' | 'S';
+type KeyName = 'left' | 'right' | 'up' | 'down' | 'A' | 'D' | 'W' | 'S' | 'X' | 'Z' | 'SPACE';
 type Keys = Record<KeyName, Phaser.Input.Keyboard.Key>;
-type DpadDir = 'left' | 'right' | 'up' | 'down';
-
-type GameState = {
-  sealed: number;
-  busted: boolean;
-  won: boolean;
-  timeMs: number;
-  lastSec: number;
-  animFrame: number;
-};
 
 export class GameScene extends Phaser.Scene {
-  private vault!: VaultModel;
-  private guardian!: Guardian;
+  private grid: Grid = emptyGrid();
+  private bag = new SevenBag();
+  private piece!: Piece;
+  private nextId!: PieceId;
+
+  private lines = 0;
+  private timeMs = 0;
+  private animFrame = 0;
+  private won = false;
+
+  private gravAccum = 0;
+  private lockAccum = 0;
+  private hDir = 0;
+  private moveCd = 0;
+
   private keys!: Keys;
-  private dpad: Record<DpadDir, boolean> = { left: false, right: false, up: false, down: false };
-  private state!: GameState;
+  private dpad = { left: false, right: false, down: false };
+  private pendRotate = false;
+  private pendHard = false;
+
+  private gStack!: Phaser.GameObjects.Graphics;
+  private gActive!: Phaser.GameObjects.Graphics;
+  private gNext!: Phaser.GameObjects.Graphics;
+  private gBar!: Phaser.GameObjects.Graphics;
+  private linesText!: Phaser.GameObjects.Text;
+
+  // rail sub-layout (set in buildRail)
+  private cxR = 0;
+  private nbX = 0;
+  private nbY = 0;
+  private nbW = 0;
+  private nbH = 0;
+  private barX = 0;
+  private barY = 0;
+  private barW = 0;
+  private barH = 0;
 
   constructor() {
     super('GameScene');
@@ -51,22 +99,19 @@ export class GameScene extends Phaser.Scene {
       /* ignore */
     }
 
-    this.vault = buildVault();
-    this.state = { sealed: 0, busted: false, won: false, timeMs: 0, lastSec: -1, animFrame: 0 };
-
-    this.cameras.main.setBackgroundColor('#0a1226');
+    this.cameras.main.setBackgroundColor('#e7edf9');
     this.cameras.main.setZoom(RENDER_SCALE);
     this.cameras.main.centerOn(CANVAS_W / 2, CANVAS_H / 2);
 
-    this.drawFloor();
-    this.drawWalls();
-    this.drawEntry();
-    this.drawLeaks();
-    this.drawExit();
+    this.buildBoard();
+    this.buildRail();
+    this.buildControls();
 
-    const sx = this.vault.spawn.c * CELL + CELL / 2;
-    const sy = this.vault.spawn.r * CELL + CELL / 2;
-    this.guardian = new Guardian(this, sx, sy);
+    this.gStack = this.add.graphics().setDepth(5);
+    this.gActive = this.add.graphics().setDepth(6);
+
+    this.nextId = this.bag.next();
+    this.spawnNext();
 
     this.keys = this.input.keyboard!.addKeys({
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
@@ -77,212 +122,349 @@ export class GameScene extends Phaser.Scene {
       D: Phaser.Input.Keyboard.KeyCodes.D,
       W: Phaser.Input.Keyboard.KeyCodes.W,
       S: Phaser.Input.Keyboard.KeyCodes.S,
+      X: Phaser.Input.Keyboard.KeyCodes.X,
+      Z: Phaser.Input.Keyboard.KeyCodes.Z,
+      SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE,
     }) as Keys;
-    this.buildDpad();
+
+    this.redrawStack();
+    this.redrawActive();
+    this.updateHud();
 
     if (__TEST_SEAM__) {
-      (window as unknown as { __GAME_STATE__: () => unknown }).__GAME_STATE__ = () => ({
-        px: this.guardian.px,
-        py: this.guardian.py,
-        sealed: this.state.sealed,
-        total: SEAL_TOTAL,
-        busted: this.state.busted,
-        won: this.state.won,
-        timeMs: this.state.timeMs,
+      const w = window as unknown as { __GAME_STATE__: () => unknown; __SCENE__: GameScene };
+      w.__SCENE__ = this;
+      w.__GAME_STATE__ = () => ({
+        lines: this.lines,
+        pieceId: this.piece.id,
+        x: this.piece.x,
+        y: this.piece.y,
+        won: this.won,
+        filled: this.grid.reduce((n, row) => n + row.filter((v) => v !== 0).length, 0),
       });
     }
   }
 
   update(_time: number, delta: number): void {
-    if (this.state.won) return;
-    this.state.animFrame++;
-    if (this.state.busted) return; // (B) freeze during the "Caught!" reset
-    this.state.timeMs += delta;
+    this.animFrame++;
+    if (this.won) return;
+    // Clamp first-frame / tab-switch delta spikes so a piece can never slam several
+    // cells in one frame (keeps the drop calm and deterministic).
+    const dt = Math.min(delta, 100);
+    this.timeMs += dt;
 
-    const dir: Dir = {
-      left: this.keys.left.isDown || this.keys.A.isDown || this.dpad.left,
-      right: this.keys.right.isDown || this.keys.D.isDown || this.dpad.right,
-      up: this.keys.up.isDown || this.keys.W.isDown || this.dpad.up,
-      down: this.keys.down.isDown || this.keys.S.isDown || this.dpad.down,
-    };
-    this.guardian.update(dir, delta / 1000, (px, py) => this.hitsWall(px, py));
+    const left = this.keys.left.isDown || this.keys.A.isDown || this.dpad.left;
+    const right = this.keys.right.isDown || this.keys.D.isDown || this.dpad.right;
+    const down = this.keys.down.isDown || this.keys.S.isDown || this.dpad.down;
+
+    const JD = Phaser.Input.Keyboard.JustDown;
+    const rotCW = JD(this.keys.up) || JD(this.keys.W) || JD(this.keys.X) || this.pendRotate;
+    const rotCCW = JD(this.keys.Z);
+    const hard = JD(this.keys.SPACE) || this.pendHard;
+    this.pendRotate = false;
+    this.pendHard = false;
+
+    if (rotCW) this.tryRotate(1);
+    if (rotCCW) this.tryRotate(-1);
+    this.moveHoriz(dt, left, right);
+
+    if (hard) {
+      this.piece = dropPosition(this.grid, this.piece);
+      this.lockPiece();
+      return;
+    }
+
+    this.applyGravity(dt, down);
+    this.redrawActive();
   }
 
-  // The Guardian's bounding box (±GUARDIAN_R) overlaps up to four cells; block if
-  // ANY is a wall. (Mirrors habit-harbor's boat collision.)
-  private hitsWall(px: number, py: number): boolean {
-    const c0 = Math.floor((px - GUARDIAN_R) / CELL);
-    const c1 = Math.floor((px + GUARDIAN_R) / CELL);
-    const r0 = Math.floor((py - GUARDIAN_R) / CELL);
-    const r1 = Math.floor((py + GUARDIAN_R) / CELL);
-    for (let rr = r0; rr <= r1; rr++) {
-      for (let cc = c0; cc <= c1; cc++) {
-        if (isWall(this.vault, cc, rr)) return true;
+  // ---- piece logic ---------------------------------------------------------
+
+  private tryMove(dir: number): void {
+    const m = move(this.grid, this.piece, dir, 0);
+    if (m) this.piece = m;
+  }
+
+  private tryRotate(dir: 1 | -1): void {
+    const r = rotate(this.grid, this.piece, dir);
+    if (r) this.piece = r;
+  }
+
+  private moveHoriz(delta: number, left: boolean, right: boolean): void {
+    const dir = left && !right ? -1 : right && !left ? 1 : 0;
+    if (dir === 0) {
+      this.hDir = 0;
+      this.moveCd = 0;
+      return;
+    }
+    if (dir !== this.hDir) {
+      this.hDir = dir;
+      this.tryMove(dir);
+      this.moveCd = DAS_MS;
+    } else {
+      this.moveCd -= delta;
+      if (this.moveCd <= 0) {
+        this.tryMove(dir);
+        this.moveCd = ARR_MS;
       }
     }
-    return false;
   }
 
-  // ---- static rendering ----------------------------------------------------
+  private applyGravity(delta: number, soft: boolean): void {
+    const grounded = move(this.grid, this.piece, 0, 1) === null;
+    if (grounded) {
+      this.lockAccum += delta;
+      if (this.lockAccum >= LOCK_DELAY_MS) this.lockPiece();
+      return;
+    }
+    this.lockAccum = 0;
+    this.gravAccum += delta;
+    const interval = soft ? SOFT_DROP_MS : GRAVITY_MS;
+    while (this.gravAccum >= interval) {
+      this.gravAccum -= interval;
+      const m = move(this.grid, this.piece, 0, 1);
+      if (m) {
+        this.piece = m;
+      } else {
+        this.gravAccum = 0;
+        break;
+      }
+    }
+  }
 
-  private drawFloor(): void {
-    const g = this.add.graphics().setDepth(0);
+  private lockPiece(): void {
+    this.grid = merge(this.grid, this.piece);
+    const res = clearLines(this.grid);
+    this.grid = res.grid;
+    if (res.cleared > 0) {
+      this.lines += res.cleared;
+      this.flashBoard(0xffffff);
+    }
+    this.gravAccum = 0;
+    this.lockAccum = 0;
+    this.spawnNext();
+    this.redrawStack();
+    this.updateHud();
+    this.redrawActive();
+  }
+
+  private spawnNext(): void {
+    this.piece = spawn(this.nextId);
+    this.nextId = this.bag.next();
+    this.gravAccum = 0;
+    this.lockAccum = 0;
+    this.drawNext();
+    if (collides(this.grid, this.piece)) this.topOut();
+  }
+
+  // Gentle, no game-over: tidy the vault and carry on (line progress is kept).
+  private topOut(): void {
+    this.grid = emptyGrid();
+    this.redrawStack();
+    this.flashBoard(0xfff0b8);
+  }
+
+  // ---- rendering -----------------------------------------------------------
+
+  private tilePx(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number, id: number, alpha = 1): void {
+    const tc = PIECE_COLORS[id] ?? PIECE_COLORS[0]!;
+    const rad = size * 0.18;
+    const i = size * 0.06;
+    g.fillStyle(tc.edge, 0.3 * alpha);
+    g.fillRoundedRect(x + i, y + i * 1.6, size - 2 * i, size - i * 1.6, rad); // soft drop shadow
+    g.fillStyle(tc.fill, alpha);
+    g.fillRoundedRect(x + i, y + i, size - 2 * i, size - 2 * i, rad);
+    g.fillStyle(tc.light, 0.85 * alpha);
+    g.fillRoundedRect(x + size * 0.16, y + i * 1.7, size * 0.68, size * 0.26, rad * 0.7); // top highlight
+  }
+
+  private ghostTile(g: Phaser.GameObjects.Graphics, c: number, r: number, id: number): void {
+    const tc = PIECE_COLORS[id] ?? PIECE_COLORS[0]!;
+    const x = BOARD_X + c * CELL;
+    const y = BOARD_Y + r * CELL;
+    const rad = CELL * 0.18;
+    g.fillStyle(tc.fill, 0.1);
+    g.fillRoundedRect(x + 3, y + 3, CELL - 6, CELL - 6, rad);
+    g.lineStyle(2, tc.edge, 0.45);
+    g.strokeRoundedRect(x + 3, y + 3, CELL - 6, CELL - 6, rad);
+  }
+
+  private redrawStack(): void {
+    this.gStack.clear();
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        if (this.vault.grid[r]?.[c] === '#') continue;
-        const x = c * CELL;
-        const y = r * CELL;
-        g.fillStyle((c + r) % 2 === 0 ? COLOR.floor : COLOR.floorAlt, 1);
-        g.fillRect(x, y, CELL, CELL);
-      }
-    }
-    g.lineStyle(1, COLOR.grid, 0.22);
-    for (let c = 0; c <= COLS; c++) {
-      g.beginPath();
-      g.moveTo(c * CELL, 0);
-      g.lineTo(c * CELL, CANVAS_H);
-      g.strokePath();
-    }
-    for (let r = 0; r <= ROWS; r++) {
-      g.beginPath();
-      g.moveTo(0, r * CELL);
-      g.lineTo(CANVAS_W, r * CELL);
-      g.strokePath();
-    }
-  }
-
-  private drawWalls(): void {
-    const g = this.add.graphics().setDepth(10);
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (this.vault.grid[r]?.[c] !== '#') continue;
-        const x = c * CELL;
-        const y = r * CELL;
-        g.fillStyle(COLOR.wallDark, 1);
-        g.fillRect(x, y, CELL, CELL);
-        g.fillStyle(COLOR.wall, 1);
-        g.fillRect(x + 2, y + 3, CELL - 4, CELL - 6);
-        g.fillStyle(COLOR.wallTop, 1);
-        g.fillRect(x + 2, y + 3, CELL - 4, 6); // top highlight
-        g.fillStyle(COLOR.bolt, 1);
-        const bolts: Array<[number, number]> = [
-          [x + 9, y + 10],
-          [x + CELL - 9, y + 10],
-          [x + 9, y + CELL - 9],
-          [x + CELL - 9, y + CELL - 9],
-        ];
-        for (const [bx, by] of bolts) g.fillCircle(bx, by, 2);
+        const v = this.grid[r]?.[c] ?? 0;
+        if (v !== 0) this.tilePx(this.gStack, BOARD_X + c * CELL, BOARD_Y + r * CELL, CELL, v);
       }
     }
   }
 
-  private drawEntry(): void {
-    const x = this.vault.spawn.c * CELL;
-    const y = this.vault.spawn.r * CELL;
-    const g = this.add.graphics().setDepth(5);
-    g.fillStyle(COLOR.entry, 0.16);
-    g.fillCircle(x + CELL / 2, y + CELL / 2, CELL * 0.42);
-    g.lineStyle(2, COLOR.entry, 0.7);
-    g.strokeCircle(x + CELL / 2, y + CELL / 2, CELL * 0.4);
+  private redrawActive(): void {
+    this.gActive.clear();
+    const id = COLOR_INDEX[this.piece.id];
+    for (const { c, r } of cells(dropPosition(this.grid, this.piece))) {
+      if (r >= 0) this.ghostTile(this.gActive, c, r, id);
+    }
+    for (const { c, r } of cells(this.piece)) {
+      if (r >= 0) this.tilePx(this.gActive, BOARD_X + c * CELL, BOARD_Y + r * CELL, CELL, id);
+    }
+  }
+
+  private drawNext(): void {
+    this.gNext.clear();
+    const p = spawn(this.nextId);
+    const cs = cells(p);
+    const csC = cs.map((k) => k.c);
+    const csR = cs.map((k) => k.r);
+    const minC = Math.min(...csC);
+    const maxC = Math.max(...csC);
+    const minR = Math.min(...csR);
+    const maxR = Math.max(...csR);
+    const w = maxC - minC + 1;
+    const h = maxR - minR + 1;
+    const ps = 22;
+    const ox = this.nbX + (this.nbW - w * ps) / 2 - minC * ps;
+    const oy = this.nbY + (this.nbH - h * ps) / 2 - minR * ps;
+    const id = COLOR_INDEX[this.nextId];
+    for (const { c, r } of cs) this.tilePx(this.gNext, ox + c * ps, oy + r * ps, ps, id);
+  }
+
+  private flashBoard(tint: number): void {
+    const f = this.add.graphics().setDepth(8);
+    f.fillStyle(tint, 0.5);
+    f.fillRoundedRect(BOARD_X - 2, BOARD_Y - 2, BOARD_W + 4, BOARD_H + 4, 10);
+    this.tweens.add({ targets: f, alpha: 0, duration: 260, onComplete: () => f.destroy() });
+  }
+
+  private updateHud(): void {
+    this.linesText.setText(`${this.lines} / ${LINES_TO_WIN}`);
+    this.gBar.clear();
+    this.gBar.fillStyle(COLOR.boardInner, 1);
+    this.gBar.fillRoundedRect(this.barX, this.barY, this.barW, this.barH, this.barH / 2);
+    const frac = Math.min(1, this.lines / LINES_TO_WIN);
+    if (frac > 0) {
+      this.gBar.fillStyle(COLOR.accent, 1);
+      this.gBar.fillRoundedRect(this.barX, this.barY, Math.max(this.barH, this.barW * frac), this.barH, this.barH / 2);
+    }
+  }
+
+  // ---- static chrome -------------------------------------------------------
+
+  private buildBoard(): void {
+    const g = this.add.graphics().setDepth(1);
+    g.fillGradientStyle(COLOR.pageTop, COLOR.pageTop, COLOR.pageBottom, COLOR.pageBottom, 1);
+    g.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    g.fillStyle(COLOR.boardShadow, 0.55);
+    g.fillRoundedRect(BOARD_X - 8, BOARD_Y - 4, BOARD_W + 16, BOARD_H + 20, 20);
+    g.fillStyle(COLOR.boardPanel, 1);
+    g.fillRoundedRect(BOARD_X - 8, BOARD_Y - 8, BOARD_W + 16, BOARD_H + 16, 18);
+    g.fillStyle(COLOR.boardInner, 1);
+    g.fillRoundedRect(BOARD_X - 2, BOARD_Y - 2, BOARD_W + 4, BOARD_H + 4, 10);
+
+    g.lineStyle(1, COLOR.grid, 1);
+    for (let c = 0; c <= COLS; c++) g.lineBetween(BOARD_X + c * CELL, BOARD_Y, BOARD_X + c * CELL, BOARD_Y + BOARD_H);
+    for (let r = 0; r <= ROWS; r++) g.lineBetween(BOARD_X, BOARD_Y + r * CELL, BOARD_X + BOARD_W, BOARD_Y + r * CELL);
+  }
+
+  private buildRail(): void {
+    this.cxR = RAIL_X + (RAIL_W - 4) / 2;
+    const g = this.add.graphics().setDepth(2);
+    g.fillStyle(COLOR.boardShadow, 0.4);
+    g.fillRoundedRect(RAIL_X + 2, BOARD_Y + 2, RAIL_W - 4, BOARD_H + 12, 16);
+    g.fillStyle(COLOR.rail, 1);
+    g.fillRoundedRect(RAIL_X, BOARD_Y - 8, RAIL_W - 4, BOARD_H + 16, 16);
+    g.lineStyle(2, COLOR.railEdge, 1);
+    g.strokeRoundedRect(RAIL_X, BOARD_Y - 8, RAIL_W - 4, BOARD_H + 16, 16);
+
+    this.nbW = 132;
+    this.nbH = 100;
+    this.nbX = this.cxR - this.nbW / 2;
+    this.nbY = BOARD_Y + 34;
+    g.fillStyle(COLOR.boardInner, 1);
+    g.fillRoundedRect(this.nbX, this.nbY, this.nbW, this.nbH, 12);
+    g.lineStyle(1.5, COLOR.railEdge, 1);
+    g.strokeRoundedRect(this.nbX, this.nbY, this.nbW, this.nbH, 12);
+
     this.add
-      .text(x + CELL / 2, y + CELL / 2, '⬆', {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#8fd0ff',
+      .text(this.cxR, this.nbY - 6, 'NEXT', { fontFamily: 'Arial', fontSize: '14px', color: '#8b96b4', resolution: TEXT_RES })
+      .setOrigin(0.5, 1)
+      .setDepth(12);
+
+    const linesY = this.nbY + this.nbH + 26;
+    this.add
+      .text(this.cxR, linesY, 'LINES CLEARED', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(12);
+    this.linesText = this.add
+      .text(this.cxR, linesY + 30, '0 / 8', {
+        fontFamily: 'Arial Black, Arial, sans-serif',
+        fontSize: '30px',
+        color: '#3b456a',
         resolution: TEXT_RES,
       })
       .setOrigin(0.5)
-      .setDepth(6);
+      .setDepth(12);
+
+    this.barX = this.nbX;
+    this.barY = linesY + 56;
+    this.barW = this.nbW;
+    this.barH = 12;
+    this.gNext = this.add.graphics().setDepth(11);
+    this.gBar = this.add.graphics().setDepth(11);
   }
 
-  // Static glowing leaks for now; Milestone C swaps these for the Leak entity + seal.
-  private drawLeaks(): void {
-    for (const leak of this.vault.leaks) {
-      const cx = leak.c * CELL + CELL / 2;
-      const cy = leak.r * CELL + CELL / 2;
-      const g = this.add.graphics({ x: cx, y: cy }).setDepth(20);
-      for (let i = 3; i >= 1; i--) {
-        g.fillStyle(COLOR.leak, (0.13 * i) / 3 + 0.04);
-        g.fillCircle(0, 0, 11 + i * 5);
-      }
-      g.fillStyle(COLOR.leak, 0.9);
-      g.fillCircle(0, 0, 13);
-      g.fillStyle(COLOR.leakGlow, 1);
-      g.fillCircle(-3, -3, 5);
-      this.add
-        .text(cx, cy, '📄', {
-          fontFamily: 'sans-serif',
-          fontSize: `${Math.round(CELL * 0.4)}px`,
-          resolution: TEXT_RES,
-        })
-        .setOrigin(0.5)
-        .setDepth(21);
-      this.tweens.add({
-        targets: g,
-        scale: { from: 0.85, to: 1.12 },
-        alpha: { from: 0.7, to: 1 },
-        duration: 820,
-        yoyo: true,
-        repeat: -1,
-      });
-    }
+  // ---- touch controls ------------------------------------------------------
+
+  private buildControls(): void {
+    const cx = this.cxR;
+    const rotY = CANVAS_H - 214;
+    const rowY = CANVAS_H - 152;
+    const dropY = CANVAS_H - 92;
+
+    this.softButton(cx, rotY, 64, 48, '⟳', () => (this.pendRotate = true), true);
+    this.softButton(cx - 50, rowY, 48, 48, '◄', (v) => (this.dpad.left = v));
+    this.softButton(cx, rowY, 48, 48, '▼', (v) => (this.dpad.down = v));
+    this.softButton(cx + 50, rowY, 48, 48, '►', (v) => (this.dpad.right = v));
+    this.softButton(cx, dropY, 148, 44, '⤓  DROP', () => (this.pendHard = true), true);
   }
 
-  private drawExit(): void {
-    const x = this.vault.exit.c * CELL;
-    const y = this.vault.exit.r * CELL;
-    const cx = x + CELL / 2;
-    const cy = y + CELL / 2;
-    const g = this.add.graphics().setDepth(15);
-    // Closed vault door (opens in Milestone C once all leaks are sealed).
-    g.fillStyle(COLOR.wallDark, 1);
-    g.fillRoundedRect(x + 3, y + 3, CELL - 6, CELL - 6, 9);
-    g.fillStyle(COLOR.exitClosed, 1);
-    g.fillRoundedRect(x + 6, y + 6, CELL - 12, CELL - 12, 7);
-    g.lineStyle(3, 0x90a0d0, 1);
-    g.strokeCircle(cx, cy - 2, 11);
-    g.beginPath();
-    g.moveTo(cx - 11, cy - 2);
-    g.lineTo(cx + 11, cy - 2);
-    g.moveTo(cx, cy - 13);
-    g.lineTo(cx, cy + 9);
-    g.strokePath();
-    this.add
-      .text(cx, y + CELL - 5, 'EXIT', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '11px',
-        color: '#9fb4d8',
-        resolution: TEXT_RES,
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(16);
-  }
-
-  // ---- touch D-pad ---------------------------------------------------------
-
-  private buildDpad(): void {
-    const cx = 82;
-    const cy = CANVAS_H - 86;
-    const make = (x: number, y: number, label: string, key: DpadDir): void => {
-      const btn = this.add
-        .rectangle(x, y, 46, 46, 0x14224a, 0.82)
-        .setStrokeStyle(2, 0x38a8f9)
-        .setDepth(110)
-        .setInteractive({ useHandCursor: true });
-      this.add
-        .text(x, y, label, { fontFamily: 'Arial', fontSize: '22px', color: '#cfeefe', resolution: TEXT_RES })
-        .setOrigin(0.5)
-        .setDepth(111);
-      const set = (v: boolean) => () => {
-        this.dpad[key] = v;
-      };
-      btn.on('pointerdown', set(true));
-      btn.on('pointerup', set(false));
-      btn.on('pointerout', set(false));
+  private softButton(
+    cx: number,
+    cy: number,
+    w: number,
+    h: number,
+    label: string,
+    set: (v: boolean) => void,
+    oneShot = false,
+  ): void {
+    const g = this.add.graphics().setDepth(20);
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(cx - w / 2, cy - h / 2, w, h, 11);
+    g.lineStyle(2, COLOR.railEdge, 1);
+    g.strokeRoundedRect(cx - w / 2, cy - h / 2, w, h, 11);
+    const txt = this.add
+      .text(cx, cy, label, { fontFamily: 'Arial', fontSize: `${Math.round(h * 0.42)}px`, color: '#5b67a6', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(21);
+    const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(22);
+    const press = (): void => {
+      txt.setScale(0.9);
     };
-    make(cx, cy - 46, '▲', 'up');
-    make(cx, cy + 46, '▼', 'down');
-    make(cx - 50, cy, '◄', 'left');
-    make(cx + 50, cy, '►', 'right');
+    const release = (): void => {
+      txt.setScale(1);
+    };
+    zone.on('pointerdown', () => {
+      set(true);
+      press();
+    });
+    zone.on('pointerup', () => {
+      if (!oneShot) set(false);
+      release();
+    });
+    zone.on('pointerout', () => {
+      if (!oneShot) set(false);
+      release();
+    });
   }
 }
