@@ -1,8 +1,9 @@
-// The Tetris scene for the Privacy Vault island. Milestone A: a clean-modern,
-// fully-playable board — soft-shadowed rounded pastel tiles on a light panel, a
-// ghost-piece landing preview, a Next box, gravity + lock-delay + line-clear, and
-// keyboard / touch controls. The quiz gate (lock each piece until a privacy question
-// is answered) arrives in Milestone B; for now pieces are freely controllable.
+// The Tetris scene for the Privacy Vault island. Milestone B adds the quiz gate:
+// every piece spawns LOCKED and drifts down slowly (holding above the question tray
+// so it stays visible) while a privacy question shows. Answer right -> you take
+// control of that piece (normal gravity + move/rotate/drop). Answer wrong -> it
+// finishes falling on autopilot, no control, and the next piece brings a new
+// question. Gentle: no lives, no game-over. The win flow + celebration land in C.
 
 import Phaser from 'phaser';
 import {
@@ -21,6 +22,7 @@ import {
   PIECE_COLORS,
   LINES_TO_WIN,
   GRAVITY_MS,
+  LOCKED_GRAVITY_MS,
   SOFT_DROP_MS,
   LOCK_DELAY_MS,
   DAS_MS,
@@ -44,17 +46,32 @@ import {
   type Piece,
   type PieceId,
 } from '../tetris';
+import { QuizCard, type Choice } from '../ui/QuizCard';
+import { pickN, type Question } from '@gg/shared';
 
 declare const __TEST_SEAM__: boolean;
 
 type KeyName = 'left' | 'right' | 'up' | 'down' | 'A' | 'D' | 'W' | 'S' | 'X' | 'Z' | 'SPACE';
 type Keys = Record<KeyName, Phaser.Input.Keyboard.Key>;
 
+// 'quiz'      = locked, drifting + holding above the tray, question open, no control
+// 'play'      = unlocked, full control + normal gravity
+// 'autopilot' = wrong answer: locked, finishing its fall on its own, no control
+type Phase = 'quiz' | 'play' | 'autopilot';
+
+// While a question is open the locked piece holds at this row so it never slides
+// behind the bottom tray (tray top = y 360; row 9 bottom = y 348).
+const QUIZ_HOLD_ROW = 9;
+
 export class GameScene extends Phaser.Scene {
   private grid: Grid = emptyGrid();
   private bag = new SevenBag();
   private piece!: Piece;
   private nextId!: PieceId;
+
+  private phase: Phase = 'quiz';
+  private qPool: Question[] = [];
+  private card!: QuizCard;
 
   private lines = 0;
   private timeMs = 0;
@@ -76,6 +93,9 @@ export class GameScene extends Phaser.Scene {
   private gNext!: Phaser.GameObjects.Graphics;
   private gBar!: Phaser.GameObjects.Graphics;
   private linesText!: Phaser.GameObjects.Text;
+  private statusText!: Phaser.GameObjects.Text;
+  private lockIcon!: Phaser.GameObjects.Text;
+  private msg: Phaser.GameObjects.Container | null = null;
 
   // rail sub-layout (set in buildRail)
   private cxR = 0;
@@ -109,9 +129,8 @@ export class GameScene extends Phaser.Scene {
 
     this.gStack = this.add.graphics().setDepth(5);
     this.gActive = this.add.graphics().setDepth(6);
-
-    this.nextId = this.bag.next();
-    this.spawnNext();
+    this.lockIcon = this.add.text(0, 0, '🔒', { fontSize: '20px', resolution: TEXT_RES }).setOrigin(0.5).setDepth(7).setVisible(false);
+    this.card = new QuizCard(this);
 
     this.keys = this.input.keyboard!.addKeys({
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
@@ -127,6 +146,9 @@ export class GameScene extends Phaser.Scene {
       SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE,
     }) as Keys;
 
+    this.nextId = this.bag.next();
+    this.spawnNext(); // first piece -> opens the first question
+
     this.redrawStack();
     this.redrawActive();
     this.updateHud();
@@ -136,6 +158,7 @@ export class GameScene extends Phaser.Scene {
       w.__SCENE__ = this;
       w.__GAME_STATE__ = () => ({
         lines: this.lines,
+        phase: this.phase,
         pieceId: this.piece.id,
         x: this.piece.x,
         y: this.piece.y,
@@ -153,6 +176,7 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 100);
     this.timeMs += dt;
 
+    const playing = this.phase === 'play';
     const left = this.keys.left.isDown || this.keys.A.isDown || this.dpad.left;
     const right = this.keys.right.isDown || this.keys.D.isDown || this.dpad.right;
     const down = this.keys.down.isDown || this.keys.S.isDown || this.dpad.down;
@@ -164,18 +188,23 @@ export class GameScene extends Phaser.Scene {
     this.pendRotate = false;
     this.pendHard = false;
 
-    if (rotCW) this.tryRotate(1);
-    if (rotCCW) this.tryRotate(-1);
-    this.moveHoriz(dt, left, right);
-
-    if (hard) {
-      this.piece = dropPosition(this.grid, this.piece);
-      this.lockPiece();
-      return;
+    // Controls only respond once the piece is unlocked.
+    if (playing) {
+      if (rotCW) this.tryRotate(1);
+      if (rotCCW) this.tryRotate(-1);
+      this.moveHoriz(dt, left, right);
+      if (hard) {
+        this.piece = dropPosition(this.grid, this.piece);
+        this.lockPiece();
+        return;
+      }
+    } else {
+      this.hDir = 0;
     }
 
-    this.applyGravity(dt, down);
+    this.stepGravity(dt, playing && down);
     this.redrawActive();
+    this.updateLockIcon();
   }
 
   // ---- piece logic ---------------------------------------------------------
@@ -190,7 +219,7 @@ export class GameScene extends Phaser.Scene {
     if (r) this.piece = r;
   }
 
-  private moveHoriz(delta: number, left: boolean, right: boolean): void {
+  private moveHoriz(dt: number, left: boolean, right: boolean): void {
     const dir = left && !right ? -1 : right && !left ? 1 : 0;
     if (dir === 0) {
       this.hDir = 0;
@@ -202,7 +231,7 @@ export class GameScene extends Phaser.Scene {
       this.tryMove(dir);
       this.moveCd = DAS_MS;
     } else {
-      this.moveCd -= delta;
+      this.moveCd -= dt;
       if (this.moveCd <= 0) {
         this.tryMove(dir);
         this.moveCd = ARR_MS;
@@ -210,23 +239,49 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private applyGravity(delta: number, soft: boolean): void {
-    const grounded = move(this.grid, this.piece, 0, 1) === null;
-    if (grounded) {
-      this.lockAccum += delta;
-      if (this.lockAccum >= LOCK_DELAY_MS) this.lockPiece();
+  private pieceMaxRow(): number {
+    let mx = -99;
+    for (const { r } of cells(this.piece)) if (r > mx) mx = r;
+    return mx;
+  }
+
+  private stepGravity(dt: number, soft: boolean): void {
+    if (this.phase === 'play') {
+      const grounded = move(this.grid, this.piece, 0, 1) === null;
+      if (grounded) {
+        this.lockAccum += dt;
+        if (this.lockAccum >= LOCK_DELAY_MS) this.lockPiece();
+        return;
+      }
+      this.lockAccum = 0;
+      this.gravAccum += dt;
+      const iv = soft ? SOFT_DROP_MS : GRAVITY_MS;
+      while (this.gravAccum >= iv) {
+        this.gravAccum -= iv;
+        const m = move(this.grid, this.piece, 0, 1);
+        if (m) this.piece = m;
+        else {
+          this.gravAccum = 0;
+          break;
+        }
+      }
       return;
     }
-    this.lockAccum = 0;
-    this.gravAccum += delta;
-    const interval = soft ? SOFT_DROP_MS : GRAVITY_MS;
-    while (this.gravAccum >= interval) {
-      this.gravAccum -= interval;
+
+    // quiz / autopilot: slow self-drift, no control.
+    this.gravAccum += dt;
+    while (this.gravAccum >= LOCKED_GRAVITY_MS) {
+      this.gravAccum -= LOCKED_GRAVITY_MS;
+      if (this.phase === 'quiz' && this.pieceMaxRow() >= QUIZ_HOLD_ROW) {
+        this.gravAccum = 0; // hold above the tray until the question is answered
+        break;
+      }
       const m = move(this.grid, this.piece, 0, 1);
       if (m) {
         this.piece = m;
       } else {
         this.gravAccum = 0;
+        if (this.phase === 'autopilot') this.lockPiece(); // it landed on its own
         break;
       }
     }
@@ -246,6 +301,7 @@ export class GameScene extends Phaser.Scene {
     this.redrawStack();
     this.updateHud();
     this.redrawActive();
+    this.updateLockIcon();
   }
 
   private spawnNext(): void {
@@ -255,6 +311,33 @@ export class GameScene extends Phaser.Scene {
     this.lockAccum = 0;
     this.drawNext();
     if (collides(this.grid, this.piece)) this.topOut();
+    this.beginQuiz();
+  }
+
+  private beginQuiz(): void {
+    this.phase = 'quiz';
+    this.updateStatus();
+    this.card.open(this.nextQuestion(), (ch) => this.onAnswer(ch));
+  }
+
+  private nextQuestion(): Question {
+    if (!this.qPool.length) this.qPool = pickN('privacy', 8);
+    return this.qPool.pop() as Question;
+  }
+
+  private onAnswer(ch: Choice): void {
+    this.card.close();
+    if (ch.isCorrect) {
+      this.phase = 'play';
+      this.gravAccum = 0;
+      this.lockAccum = 0;
+      this.flashMessage('🔓  Your move!', 'good');
+      this.flashBoard(0xdaf3e0);
+    } else {
+      this.phase = 'autopilot';
+      this.flashMessage('🤖  Autopilot — answer the next one!', 'warn');
+    }
+    this.updateStatus();
   }
 
   // Gentle, no game-over: tidy the vault and carry on (line progress is kept).
@@ -302,12 +385,35 @@ export class GameScene extends Phaser.Scene {
   private redrawActive(): void {
     this.gActive.clear();
     const id = COLOR_INDEX[this.piece.id];
-    for (const { c, r } of cells(dropPosition(this.grid, this.piece))) {
-      if (r >= 0) this.ghostTile(this.gActive, c, r, id);
+    if (this.phase === 'play') {
+      for (const { c, r } of cells(dropPosition(this.grid, this.piece))) {
+        if (r >= 0) this.ghostTile(this.gActive, c, r, id);
+      }
     }
     for (const { c, r } of cells(this.piece)) {
       if (r >= 0) this.tilePx(this.gActive, BOARD_X + c * CELL, BOARD_Y + r * CELL, CELL, id);
     }
+  }
+
+  private updateLockIcon(): void {
+    if (this.phase === 'play') {
+      this.lockIcon.setVisible(false);
+      return;
+    }
+    const cs = cells(this.piece);
+    let sc = 0;
+    let sr = 0;
+    for (const { c, r } of cs) {
+      sc += c;
+      sr += r;
+    }
+    const n = cs.length || 1;
+    const x = BOARD_X + (sc / n + 0.5) * CELL;
+    const y = BOARD_Y + (sr / n + 0.5) * CELL;
+    this.lockIcon
+      .setText(this.phase === 'autopilot' ? '🤖' : '🔒')
+      .setPosition(x, Math.max(y, BOARD_Y + 18))
+      .setVisible(true);
   }
 
   private drawNext(): void {
@@ -334,6 +440,44 @@ export class GameScene extends Phaser.Scene {
     f.fillStyle(tint, 0.5);
     f.fillRoundedRect(BOARD_X - 2, BOARD_Y - 2, BOARD_W + 4, BOARD_H + 4, 10);
     this.tweens.add({ targets: f, alpha: 0, duration: 260, onComplete: () => f.destroy() });
+  }
+
+  private flashMessage(text: string, kind: 'good' | 'warn'): void {
+    this.msg?.destroy(true);
+    const x = BOARD_X + BOARD_W / 2;
+    const y = BOARD_Y + 26;
+    const accent = kind === 'good' ? 0x43c06d : 0xef9a6a;
+    const t = this.add
+      .text(0, 0, text, { fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#3b456a', resolution: TEXT_RES })
+      .setOrigin(0.5);
+    const w = t.width + 30;
+    const h = t.height + 16;
+    const g = this.add.graphics();
+    g.fillStyle(COLOR.boardShadow, 0.4);
+    g.fillRoundedRect(x - w / 2, y - h / 2 + 3, w, h, h / 2);
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, h / 2);
+    g.lineStyle(2, accent, 1);
+    g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, h / 2);
+    t.setPosition(x, y);
+    const cont = this.add.container(0, 0, [g, t]).setDepth(120);
+    this.msg = cont;
+    this.tweens.add({
+      targets: cont,
+      alpha: { from: 1, to: 0 },
+      y: { from: 0, to: -10 },
+      delay: 1100,
+      duration: 420,
+      onComplete: () => {
+        cont.destroy(true);
+        if (this.msg === cont) this.msg = null;
+      },
+    });
+  }
+
+  private updateStatus(): void {
+    const label = this.phase === 'play' ? '🔓 Your move!' : this.phase === 'autopilot' ? '🤖 Autopilot…' : '🔒 Answer to steer';
+    this.statusText.setText(label);
   }
 
   private updateHud(): void {
@@ -412,6 +556,11 @@ export class GameScene extends Phaser.Scene {
     this.barH = 12;
     this.gNext = this.add.graphics().setDepth(11);
     this.gBar = this.add.graphics().setDepth(11);
+
+    this.statusText = this.add
+      .text(this.cxR, this.barY + 34, '', { fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#6f8cff', resolution: TEXT_RES })
+      .setOrigin(0.5)
+      .setDepth(12);
   }
 
   // ---- touch controls ------------------------------------------------------
@@ -448,23 +597,17 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(21);
     const zone = this.add.zone(cx, cy, w, h).setInteractive({ useHandCursor: true }).setDepth(22);
-    const press = (): void => {
-      txt.setScale(0.9);
-    };
-    const release = (): void => {
-      txt.setScale(1);
-    };
     zone.on('pointerdown', () => {
       set(true);
-      press();
+      txt.setScale(0.9);
     });
     zone.on('pointerup', () => {
       if (!oneShot) set(false);
-      release();
+      txt.setScale(1);
     });
     zone.on('pointerout', () => {
       if (!oneShot) set(false);
-      release();
+      txt.setScale(1);
     });
   }
 }
