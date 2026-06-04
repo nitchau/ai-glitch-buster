@@ -5,45 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Glitch Guardians</title>
     <style>
-      :root {
-        --bg: #0a0820;
-        --node: #14224a;
-        --node2: #0e1a3a;
-        --green: #43e97b;
-        --cyan: #38f9d7;
-        --ink: #cfeefe;
-        --muted: #7e8bb0;
-        --path: #2a3a66;
-      }
       * {
         box-sizing: border-box;
       }
+      html,
       body {
         margin: 0;
+        min-height: 100%;
+      }
+      body {
         min-height: 100vh;
-        background: radial-gradient(1100px 700px at 50% -5%, #1a1247 0%, var(--bg) 60%);
-        color: var(--ink);
-        font-family: 'Trebuchet MS', system-ui, sans-serif;
-        padding: 1.5rem 1rem 2.5rem;
+        overflow-x: hidden;
+        background:
+          radial-gradient(120% 85% at 50% 6%, #2a1a6e 0%, #150f3e 40%, #0a0820 74%),
+          linear-gradient(#0a0820, #07142c);
+        color: #eaf3ff;
+        font-family: 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
         text-align: center;
       }
+
+      /* starry sky + drifting clouds, behind everything */
+      .sky {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .star {
+        position: absolute;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 6px #fff;
+        animation: tw 2.4s ease-in-out infinite;
+      }
+      @keyframes tw {
+        0%,
+        100% {
+          opacity: 0.25;
+          transform: scale(0.7);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.25);
+        }
+      }
+      .cloud {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 50px;
+        filter: blur(9px);
+        animation: drift linear infinite;
+      }
+      @keyframes drift {
+        from {
+          transform: translateX(-35vw);
+        }
+        to {
+          transform: translateX(135vw);
+        }
+      }
+
+      .head {
+        position: relative;
+        z-index: 2;
+        padding: 1.4rem 1rem 0.3rem;
+      }
       h1 {
-        font-size: clamp(1.8rem, 5.5vw, 3rem);
-        margin: 0.2em 0 0;
-        color: var(--green);
-        text-shadow: 0 2px 0 #06351f, 0 0 24px rgba(67, 233, 123, 0.35);
+        margin: 0;
+        font-size: clamp(2rem, 7vw, 3.6rem);
+        font-weight: 900;
+        background: linear-gradient(90deg, #ffd34d, #43e97b, #38f9d7, #b06cff, #ff6b4a);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35));
+        animation: wob 4s ease-in-out infinite;
+      }
+      @keyframes wob {
+        0%,
+        100% {
+          transform: rotate(-1.3deg);
+        }
+        50% {
+          transform: rotate(1.3deg);
+        }
       }
       .sub {
-        opacity: 0.85;
-        font-size: clamp(0.95rem, 3vw, 1.2rem);
-        margin-top: 0.35em;
+        font-size: clamp(0.95rem, 3vw, 1.25rem);
+        color: #cfd8ff;
+        margin-top: 0.3em;
       }
-      /* The island map: 4 corners + a centre Core, paths drawn behind the nodes. */
+
       .map {
         position: relative;
-        width: min(94vw, 760px);
-        aspect-ratio: 5 / 4;
-        margin: 1.4rem auto 0;
+        z-index: 1;
+        width: min(95vw, 840px);
+        aspect-ratio: 8 / 6;
+        margin: 0.4rem auto 0;
       }
       .paths {
         position: absolute;
@@ -51,116 +110,179 @@
         width: 100%;
         height: 100%;
         overflow: visible;
+        z-index: 1;
       }
       .seg {
-        stroke: var(--path);
-        stroke-width: 5;
         fill: none;
+        stroke: #46407a;
+        stroke-width: 6;
         stroke-linecap: round;
-        stroke-dasharray: 2 9;
+        stroke-dasharray: 0.1 11;
         vector-effect: non-scaling-stroke;
-        opacity: 0.7;
+        opacity: 0.6;
       }
       .seg.active {
-        stroke: var(--green);
-        stroke-width: 6;
-        stroke-dasharray: 10 8;
+        stroke: #ffe14d;
+        stroke-width: 7;
+        stroke-dasharray: 0.1 13;
         opacity: 1;
-        filter: drop-shadow(0 0 4px rgba(67, 233, 123, 0.7));
-        animation: flow 0.9s linear infinite;
+        filter: drop-shadow(0 0 5px rgba(255, 225, 77, 0.9));
+        animation: march 0.8s linear infinite;
       }
-      @keyframes flow {
+      @keyframes march {
         to {
-          stroke-dashoffset: -18;
+          stroke-dashoffset: -13;
         }
       }
-      .node {
+
+      .isle {
         position: absolute;
         transform: translate(-50%, -50%);
-        width: clamp(108px, 17vw, 150px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.15rem;
+        z-index: 2;
+      }
+      .shadow {
+        position: absolute;
+        left: 50%;
+        top: 76%;
+        transform: translateX(-50%);
+        width: clamp(58px, 9vw, 88px);
+        height: 15px;
+        background: rgba(0, 0, 0, 0.42);
+        border-radius: 50%;
+        filter: blur(5px);
+        z-index: 0;
+      }
+      .float {
+        display: block;
         text-decoration: none;
         color: inherit;
-        background: linear-gradient(160deg, var(--node), var(--node2));
-        border: 2px solid #2a3a66;
-        border-radius: 16px;
-        padding: 0.7rem 0.5rem 0.6rem;
-        transition:
-          transform 0.12s ease,
-          border-color 0.12s ease,
-          box-shadow 0.12s ease;
+        position: relative;
+        z-index: 1;
+        animation: bob 3s ease-in-out infinite;
       }
-      .node .icon {
-        font-size: clamp(1.7rem, 4.5vw, 2.4rem);
-        line-height: 1;
+      @keyframes bob {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-9px);
+        }
       }
-      .node .name {
-        font-weight: 800;
-        font-size: clamp(0.78rem, 2vw, 0.98rem);
-        line-height: 1.1;
-      }
-      .node .badge {
-        font-size: clamp(0.68rem, 1.7vw, 0.82rem);
-        color: var(--muted);
-        margin-top: 0.1em;
-      }
-      .node .badge.go {
-        color: var(--green);
-        font-weight: 700;
-      }
-      .node .badge.done {
-        color: var(--cyan);
-        letter-spacing: 1px;
-      }
-      .node.play {
-        border-color: var(--green);
-        box-shadow: 0 6px 22px rgba(67, 233, 123, 0.18);
-        cursor: pointer;
-      }
-      .node.play:hover {
-        transform: translate(-50%, -50%) translateY(-4px);
-        border-color: var(--cyan);
-        box-shadow: 0 12px 30px rgba(56, 249, 215, 0.28);
-      }
-      .node.locked {
-        opacity: 0.55;
-        filter: grayscale(0.35);
-      }
-      /* The Core sits in the centre as the final goal. */
-      .node.core {
-        width: clamp(118px, 18vw, 158px);
-        aspect-ratio: 1;
-        border-radius: 50%;
+      .land {
+        width: clamp(80px, 12vw, 110px);
+        height: clamp(80px, 12vw, 110px);
+        margin: 0 auto;
+        border-radius: 49% 51% 46% 54% / 56% 53% 47% 44%;
+        display: flex;
+        align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at 50% 35%, #3a1f5e, var(--node2));
+        font-size: clamp(2.1rem, 5.5vw, 3rem);
+        border: 3px solid rgba(255, 255, 255, 0.45);
+        box-shadow:
+          inset 0 -10px 0 rgba(0, 0, 0, 0.18),
+          0 10px 22px rgba(0, 0, 0, 0.4);
+        background: radial-gradient(circle at 36% 28%, var(--l), var(--c) 55%, var(--d));
+      }
+      .float.play:hover {
+        transform: translateY(-6px) scale(1.05);
+      }
+      .label {
+        margin: 0.45rem auto 0;
+        font-weight: 800;
+        font-size: clamp(0.76rem, 1.9vw, 0.98rem);
+        background: rgba(8, 12, 32, 0.72);
+        border: 1.5px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        padding: 0.18em 0.7em;
+        display: inline-block;
+        max-width: 9.5rem;
+        line-height: 1.15;
+      }
+      .badge {
+        margin-top: 0.32rem;
+        font-size: clamp(0.74rem, 1.8vw, 0.92rem);
+        font-weight: 800;
+      }
+      .badge.go {
+        color: #0a1226;
+        background: #43e97b;
+        border-radius: 999px;
+        padding: 0.16em 0.8em;
+        display: inline-block;
+        box-shadow: 0 0 14px rgba(67, 233, 123, 0.6);
+        animation: pop 1.1s ease-in-out infinite;
+      }
+      @keyframes pop {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.12);
+        }
+      }
+      .badge.done {
+        color: #ffd34d;
+        font-size: 1.05rem;
+        letter-spacing: 2px;
+      }
+      .badge.lock {
+        color: #9aa6d6;
+      }
+      .float.locked {
+        opacity: 0.62;
+      }
+      .float.locked .land {
+        filter: grayscale(0.4) brightness(0.9);
+      }
+      .isle.core .land {
+        width: clamp(98px, 15vw, 142px);
+        height: clamp(98px, 15vw, 142px);
+        animation: glow 2.2s ease-in-out infinite;
+      }
+      @keyframes glow {
+        0%,
+        100% {
+          box-shadow:
+            inset 0 -10px 0 rgba(0, 0, 0, 0.18),
+            0 0 24px 6px rgba(255, 107, 74, 0.5);
+        }
+        50% {
+          box-shadow:
+            inset 0 -10px 0 rgba(0, 0, 0, 0.18),
+            0 0 42px 15px rgba(255, 107, 74, 0.85);
+        }
       }
       footer {
-        margin-top: 1.6rem;
-        color: var(--muted);
+        position: relative;
+        z-index: 2;
+        color: #9aa6d6;
         font-size: 0.82rem;
+        padding: 1rem 1rem 2rem;
       }
     </style>
   </head>
   <body>
-    <h1>Glitch Guardians</h1>
-    <div class="sub">Clear an island to light the path to the next!</div>
+    <div class="sky" id="sky"></div>
+    <div class="head">
+      <h1>Glitch Guardians</h1>
+      <div class="sub">🚀 Island-hop across Datapolis and clear every glitch!</div>
+    </div>
     <div class="map" id="map">
       <svg class="paths" viewBox="0 0 100 100" preserveAspectRatio="none" id="paths"></svg>
     </div>
-    <footer>Your progress is saved on this device. ⭐ = stars earned.</footer>
+    <footer>Beat an island to light the path to the next one. ⭐ = stars earned!</footer>
     <script>
-      // 4 islands in the corners + The Core in the centre (x/y are % of the map).
+      // 4 islands in the corners + The Core in the centre, each with its own colours.
       var ISLANDS = [
-        { id: 'bias-breaker', name: 'Bias Breaker', icon: '⚖️', built: true, x: 15, y: 18 },
-        { id: 'habit-harbor', name: 'Bad-Habit Harbor', icon: '🌊', built: true, x: 85, y: 18 },
-        { id: 'privacy-vaults', name: 'Privacy Vault', icon: '🔐', built: false, x: 85, y: 82 },
-        { id: 'reality-tower', name: 'Hallucination Tower', icon: '🗼', built: false, x: 15, y: 82 },
-        { id: 'the-core', name: 'The Core', icon: '💥', built: false, x: 50, y: 50 },
+        { id: 'bias-breaker', name: 'Bias Breaker', icon: '⚖️', built: true, x: 17, y: 24, l: '#8ff7b6', c: '#43e97b', d: '#1f9e54' },
+        { id: 'habit-harbor', name: 'Bad-Habit Harbor', icon: '🌊', built: true, x: 83, y: 20, l: '#9bd8ff', c: '#38a8f9', d: '#1c6fc0' },
+        { id: 'privacy-vaults', name: 'Privacy Vault', icon: '🔐', built: false, x: 84, y: 78, l: '#ffe48a', c: '#ffce3a', d: '#c79a16' },
+        { id: 'reality-tower', name: 'Hallucination Tower', icon: '🗼', built: false, x: 16, y: 80, l: '#d9b3ff', c: '#b06cff', d: '#7d3fd0' },
+        { id: 'the-core', name: 'The Core', icon: '💥', built: false, x: 50, y: 50, l: '#ffc59e', c: '#ff6b4a', d: '#c23a1e' },
       ];
-      // The unlock chain: clearing one island lights the path to (and opens) the next.
+      // Unlock chain: clearing one island lights the trail to (and opens) the next.
       var CHAIN = [
         ['bias-breaker', 'habit-harbor'],
         ['habit-harbor', 'privacy-vaults'],
@@ -182,11 +304,10 @@
         return null;
       }
       var profile = loadProfile();
-      // No profile → only the first island is open (mirrors @gg/shared blankProgress).
-      function stateFor(island) {
-        var p = profile && profile.progress ? profile.progress[island.id] : null;
+      function stateFor(o) {
+        var p = profile && profile.progress ? profile.progress[o.id] : null;
         return {
-          unlocked: p ? !!p.unlocked : island.id === 'bias-breaker',
+          unlocked: p ? !!p.unlocked : o.id === 'bias-breaker',
           cleared: p ? !!p.cleared : false,
           stars: p && p.stars ? p.stars : 0,
         };
@@ -196,59 +317,83 @@
         return '⭐'.repeat(n) + '☆'.repeat(3 - n);
       }
 
-      // Paths first (behind the nodes): a segment glows + flows once its destination unlocks.
-      var svg = document.getElementById('paths');
-      var SVGNS = 'http://www.w3.org/2000/svg';
-      CHAIN.forEach(function (seg) {
-        var a = byId(seg[0]);
-        var b = byId(seg[1]);
-        var line = document.createElementNS(SVGNS, 'line');
-        line.setAttribute('x1', a.x);
-        line.setAttribute('y1', a.y);
-        line.setAttribute('x2', b.x);
-        line.setAttribute('y2', b.y);
-        line.setAttribute('class', 'seg' + (stateFor(b).unlocked ? ' active' : ''));
-        svg.appendChild(line);
+      // ---- starry sky + clouds ----
+      var sky = document.getElementById('sky');
+      for (var i = 0; i < 54; i++) {
+        var s = document.createElement('div');
+        s.className = 'star';
+        s.style.left = Math.random() * 100 + '%';
+        s.style.top = Math.random() * 100 + '%';
+        var sz = 1 + Math.random() * 2.4;
+        s.style.width = s.style.height = sz + 'px';
+        s.style.animationDelay = Math.random() * 2.4 + 's';
+        sky.appendChild(s);
+      }
+      [[150, 9, 34], [210, 24, 52], [110, 68, 44]].forEach(function (c, k) {
+        var d = document.createElement('div');
+        d.className = 'cloud';
+        d.style.width = c[0] + 'px';
+        d.style.height = c[0] * 0.32 + 'px';
+        d.style.top = c[1] + '%';
+        d.style.animationDuration = c[2] + 's';
+        d.style.animationDelay = -(k * 12 + 6) + 's';
+        sky.appendChild(d);
       });
 
-      // Island nodes on top.
-      var map = document.getElementById('map');
-      ISLANDS.forEach(function (island) {
-        var s = stateFor(island);
-        var playable = island.built && s.unlocked;
-        var el = document.createElement(playable ? 'a' : 'div');
-        el.className =
-          'node ' + (playable ? 'play' : 'locked') + (island.id === 'the-core' ? ' core' : '');
-        el.style.left = island.x + '%';
-        el.style.top = island.y + '%';
-        if (playable) el.href = '/' + island.id + '/';
+      // ---- curvy dotted trails (behind the islands) ----
+      var svg = document.getElementById('paths');
+      var NS = 'http://www.w3.org/2000/svg';
+      CHAIN.forEach(function (seg, idx) {
+        var a = byId(seg[0]);
+        var b = byId(seg[1]);
+        var mx = (a.x + b.x) / 2;
+        var my = (a.y + b.y) / 2;
+        var dx = b.x - a.x;
+        var dy = b.y - a.y;
+        var len = Math.hypot(dx, dy) || 1;
+        var bow = (idx % 2 ? -1 : 1) * 13; // alternate the arc direction for a windy trail
+        var cx = mx + (-dy / len) * bow;
+        var cy = my + (dx / len) * bow;
+        var p = document.createElementNS(NS, 'path');
+        p.setAttribute('d', 'M ' + a.x + ' ' + a.y + ' Q ' + cx + ' ' + cy + ' ' + b.x + ' ' + b.y);
+        p.setAttribute('class', 'seg' + (stateFor(b).unlocked ? ' active' : ''));
+        svg.appendChild(p);
+      });
 
+      // ---- floating islands ----
+      var map = document.getElementById('map');
+      ISLANDS.forEach(function (o, idx) {
+        var st = stateFor(o);
+        var playable = o.built && st.unlocked;
         var badge, cls;
-        if (!island.built) {
-          badge = '🔒 Coming soon';
-          cls = '';
-        } else if (!s.unlocked) {
+        if (!o.built) {
+          badge = '✨ Soon';
+          cls = 'lock';
+        } else if (!st.unlocked) {
           badge = '🔒 Locked';
-          cls = '';
-        } else if (s.cleared) {
-          badge = starStr(s.stars);
+          cls = 'lock';
+        } else if (st.cleared) {
+          badge = starStr(st.stars);
           cls = 'done';
         } else {
-          badge = '▶ Play';
+          badge = '▶ PLAY!';
           cls = 'go';
         }
-
-        el.innerHTML =
-          '<div class="icon">' +
-          island.icon +
-          '</div><div class="name">' +
-          island.name +
-          '</div><div class="badge ' +
-          cls +
-          '">' +
-          badge +
-          '</div>';
-        map.appendChild(el);
+        var tag = playable ? 'a' : 'div';
+        var isle = document.createElement('div');
+        isle.className = 'isle' + (o.id === 'the-core' ? ' core' : '');
+        isle.style.left = o.x + '%';
+        isle.style.top = o.y + '%';
+        isle.innerHTML =
+          '<div class="shadow"></div>' +
+          '<' + tag + ' class="float ' + (playable ? 'play' : 'locked') + '"' +
+          ' style="animation-delay:' + (idx * 0.45).toFixed(2) + 's"' +
+          (playable ? ' href="/' + o.id + '/"' : '') + '>' +
+          '<div class="land" style="--l:' + o.l + ';--c:' + o.c + ';--d:' + o.d + '">' + o.icon + '</div>' +
+          '<div class="label">' + o.name + '</div>' +
+          '<div class="badge ' + cls + '">' + badge + '</div>' +
+          '</' + tag + '>';
+        map.appendChild(isle);
       });
     </script>
   </body>
