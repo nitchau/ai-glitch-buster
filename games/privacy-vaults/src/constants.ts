@@ -27,7 +27,7 @@ export const CANVAS_H = PAD + BOARD_H + PAD; // 756
 export const RENDER_SCALE = 2;
 
 // --- rules --------------------------------------------------------------------
-export const SECURE_GOAL = 8; // correct privacy answers to clear a level
+export const LINES_GOAL = 5; // lines to clear to win a level
 
 // --- timing (ms) — level-1 base; the scene scales by SPEEDUP each level --------
 export const BASE_GRAVITY_MS = 650; // normal fall (one cell) when unlocked

@@ -7,9 +7,10 @@
 // Quiz gate: every piece spawns LOCKED and drifts down slowly while a privacy
 // question shows on the side. Answer right -> you take control of that piece. Answer
 // wrong -> it finishes falling on autopilot. DON'T answer in time -> it just lands on
-// the stack and the next question comes (no waiting). Clear SECURE_GOAL (8) correct
-// answers -> you win the level: Hallucination Tower unlocks, and you can keep going
-// at a faster level. Gentle throughout: no lives, no game-over.
+// the stack and the next question comes (no waiting). Answering just unlocks the
+// block so you can place it; clearing LINES_GOAL (5) lines wins the level ->
+// Hallucination Tower unlocks, and you can keep going at a faster level. Gentle
+// throughout: no lives, no game-over.
 
 import Phaser from 'phaser';
 import {
@@ -27,7 +28,7 @@ import {
   TEXT_RES,
   COLOR,
   PIECE_COLORS,
-  SECURE_GOAL,
+  LINES_GOAL,
   BASE_GRAVITY_MS,
   BASE_LOCKED_MS,
   SOFT_DROP_MS,
@@ -180,7 +181,7 @@ export class GameScene extends Phaser.Scene {
       w.__GAME_STATE__ = () => ({
         phase: this.phase,
         correct: this.correctCount,
-        goal: SECURE_GOAL,
+        goal: LINES_GOAL,
         lines: this.linesCleared,
         level: this.level,
         pieceId: this.piece.id,
@@ -309,9 +310,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.gravAccum = 0;
     this.lockAccum = 0;
-    this.spawnNext();
     this.redrawStack();
     this.updateHud();
+    if (this.linesCleared >= LINES_GOAL) {
+      this.winLevel(); // clearing enough lines wins the level
+      return;
+    }
+    this.spawnNext();
     this.redrawActive();
     this.updateLockIcon();
   }
@@ -341,16 +346,14 @@ export class GameScene extends Phaser.Scene {
   private onAnswer(ch: Choice): void {
     this.card.close();
     if (ch.isCorrect) {
+      // Answering right just unlocks control of this block — clearing LINES is the
+      // goal now, so a correct answer is a (fun) stat, not the win counter.
       this.correctCount++;
-      this.updateHud();
-      if (this.correctCount >= SECURE_GOAL) {
-        this.winLevel();
-        return;
-      }
       this.phase = 'play';
       this.gravAccum = 0;
       this.lockAccum = 0;
       this.controlsGroup.setVisible(true);
+      this.updateHud();
       this.flashMessage('🔓  Your move!', 'good');
       this.flashBoard(0xdaf3e0);
     } else {
@@ -391,6 +394,7 @@ export class GameScene extends Phaser.Scene {
     this.gravityMs = Math.max(MIN_GRAVITY_MS, BASE_GRAVITY_MS * Math.pow(SPEEDUP, this.level - 1));
     this.lockedMs = Math.max(MIN_LOCKED_MS, BASE_LOCKED_MS * Math.pow(SPEEDUP, this.level - 1));
     this.correctCount = 0;
+    this.linesCleared = 0;
     this.grid = emptyGrid();
     this.redrawStack();
     this.winOverlay?.destroy(true);
@@ -539,13 +543,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateHud(): void {
-    this.securedText.setText(`${this.correctCount} / ${SECURE_GOAL}`);
-    this.linesText.setText(`Lines cleared: ${this.linesCleared}`);
+    // securedText is the big GOAL number = lines cleared / LINES_GOAL.
+    // linesText is now a small "answered" stat (answers no longer drive the win).
+    this.securedText.setText(`${this.linesCleared} / ${LINES_GOAL}`);
+    this.linesText.setText(`✓ Answered: ${this.correctCount}`);
     this.levelText.setText(`⚡ Level ${this.level}`);
     this.gBar.clear();
     this.gBar.fillStyle(COLOR.boardInner, 1);
     this.gBar.fillRoundedRect(this.barX, this.barY, this.barW, this.barH, this.barH / 2);
-    const frac = Math.min(1, this.correctCount / SECURE_GOAL);
+    const frac = Math.min(1, this.linesCleared / LINES_GOAL);
     if (frac > 0) {
       this.gBar.fillStyle(COLOR.accent, 1);
       this.gBar.fillRoundedRect(this.barX, this.barY, Math.max(this.barH, this.barW * frac), this.barH, this.barH / 2);
@@ -604,11 +610,11 @@ export class GameScene extends Phaser.Scene {
 
     // SECURED goal
     this.add
-      .text(CXP, 200, '🔒 PRIVACY SECURED', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
+      .text(CXP, 200, '🧱 LINES CLEARED', { fontFamily: 'Arial', fontSize: '13px', color: '#8b96b4', resolution: TEXT_RES })
       .setOrigin(0.5)
       .setDepth(12);
     this.securedText = this.add
-      .text(CXP, 230, '0 / 8', {
+      .text(CXP, 230, '0 / 5', {
         fontFamily: 'Arial Black, Arial, sans-serif',
         fontSize: '30px',
         color: '#3b456a',
@@ -624,7 +630,7 @@ export class GameScene extends Phaser.Scene {
     this.gBar = this.add.graphics().setDepth(11);
 
     this.linesText = this.add
-      .text(CXP, 280, 'Lines cleared: 0', { fontFamily: 'Arial', fontSize: '12px', color: '#8b96b4', resolution: TEXT_RES })
+      .text(CXP, 280, '✓ Answered: 0', { fontFamily: 'Arial', fontSize: '12px', color: '#8b96b4', resolution: TEXT_RES })
       .setOrigin(0.5)
       .setDepth(12);
 
@@ -741,7 +747,7 @@ export class GameScene extends Phaser.Scene {
     );
     cont.add(
       this.add
-        .text(cx, cardY + 100, `You secured ${SECURE_GOAL} privacy facts!`, {
+        .text(cx, cardY + 100, `You cleared ${LINES_GOAL} lines!`, {
           fontFamily: 'Arial',
           fontSize: '17px',
           color: '#5b67a6',
