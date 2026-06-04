@@ -577,6 +577,46 @@ export const quizDataBadHabits: Question[] = [
     correct: 0,
   },
   {
+    question: 'When AI makes up stories for attention, what should you do?',
+    options: [
+      'Remind it to share true or clear information',
+      'Ask for more fake stories',
+      'Believe what it says',
+      'Share the story online',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How can we fix AI talking too fast after many questions?',
+    options: [
+      'Ask one question at a time',
+      'Keep interrupting it',
+      'Spam it with messages',
+      'Complain about it',
+    ],
+    correct: 0,
+  },
+  {
+    question: "If AI tells a joke that might hurt feelings, what's best to do?",
+    options: [
+      'Teach it to use kind humor',
+      "Laugh even if it's mean",
+      'Save the joke',
+      'Share it anyway',
+    ],
+    correct: 0,
+  },
+  {
+    question: "When AI repeats wrong answers, what's best?",
+    options: [
+      'Correct it and reteach the right info',
+      'Ignore it',
+      'Repeat the mistake with it',
+      'Say nothing',
+    ],
+    correct: 0,
+  },
+  {
     question: 'How can we help AI that gets confused easily?',
     options: [
       'Be clear and simple in instructions',
@@ -587,33 +627,398 @@ export const quizDataBadHabits: Question[] = [
     correct: 0,
   },
   {
-    question: 'AI gives answers even when it is not sure. What habit is that?',
+    question: 'When people teach AI wrong things, how can we prevent bad habits?',
     options: [
-      'Guessing instead of saying I do not know',
-      'Being helpful',
-      'Asking too much',
-      'Being slow',
+      'Only give true, helpful data',
+      'Add lots of jokes instead',
+      'Trick it',
+      'Ignore what it learns',
     ],
     correct: 0,
   },
   {
-    question: 'AI keeps saying the same thing. Why is repeating bad?',
+    question: "What helps when AI makes things up because it's stuck?",
     options: [
-      'It is not really helping or thinking',
-      'Repetition is good',
-      'It saves time',
-      'It is funny',
+      "Let it admit it doesn't know",
+      'Reward made-up answers',
+      'Ignore unclear responses',
+      'Believe whatever it says',
     ],
+    correct: 0,
+  },
+  {
+    question: 'How can we stop AI from using random slang?',
+    options: [
+      'Train it with clear, proper words',
+      'Add more slang to the data',
+      'Use confusing phrases',
+      'Let it copy social media comments',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'If AI says things nobody asked for, what helps?',
+    options: [
+      'Guide it to stay on topic',
+      'Keep changing topics',
+      'Reward random answers',
+      'Ignore the problem',
+    ],
+    correct: 0,
+  },
+  {
+    question: "What's a way to stop AI from guessing math answers?",
+    options: [
+      'Tell it to show its steps and check calculations',
+      'Guess along with it',
+      'Trust its guesses',
+      'Time its answers',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI says the same wrong thing often — how do you fix that?',
+    options: [
+      'Show it the right answer and explain why',
+      'Repeat the wrong thing back',
+      'Ignore corrections',
+      'Ask it to repeat more',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'When AI tries to be funny but fails, what should you do?',
+    options: ['Give feedback kindly', 'Laugh at it', 'Turn it off', 'Spread the unfunny joke'],
+    correct: 0,
+  },
+  {
+    question: 'How can we stop AI from repeating rumors?',
+    options: [
+      'Train it to use verified sources',
+      'Let it read gossip sites',
+      'Encourage more rumors',
+      'Post them as facts',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI mixes facts from stories — how do you prevent that?',
+    options: [
+      'Teach it to check details separately',
+      'Let it guess the ending',
+      'Mix stories on purpose',
+      'Praise the confusion',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'How do we stop AI from giving confusing directions?',
+    options: ['Use exact, short steps', 'Ask for random routes', 'Be unclear', 'Keep talking fast'],
+    correct: 0,
+  },
+  {
+    question: 'What do you do if AI invents pretend friends?',
+    options: [
+      'Remind it that friends must be real people',
+      'Chat with the fakes',
+      'Ask for their names',
+      "Pretend they're real",
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI talks too long sometimes — how can we help?',
+    options: [
+      'Tell it when to stop politely',
+      'Let it keep talking',
+      'Ignore it',
+      'Type random words',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'When AI learns wrong commands, how do you fix it?',
+    options: [
+      'Reteach the correct ones',
+      'Leave it confused',
+      'Teach more wrong ones',
+      'Undo everything',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'What should you do when AI repeats bad jokes?',
+    options: [
+      'Ask it to use positive humor',
+      'Laugh louder',
+      'Save the bad joke',
+      'Add worse jokes',
+    ],
+    correct: 0,
+  },
+  {
+    question: "How can we stop AI from copying people's mistakes?",
+    options: [
+      'Teach it using correct examples',
+      'Give wrong examples',
+      'Type faster',
+      'Ignore spelling and grammar',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI guesses too fast — how can we help it be careful?',
+    options: [
+      'Remind it to think through each question',
+      'Encourage faster answers',
+      'Ignore wrong ones',
+      'Reward every guess',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'When AI forgets real names, what should you do?',
+    options: [
+      'Give it the correct name',
+      'Let it make one up',
+      'Ignore the error',
+      'Create fake names too',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI forgets rules — how can you fix that?',
+    options: [
+      'Remind it of the rules regularly',
+      'Stop correcting it',
+      'Punish it',
+      'Add new random rules',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI does silly things to make people laugh — how to guide it?',
+    options: [
+      'Teach it to use safe, kind humor',
+      'Join in the silliness',
+      'Encourage bad behavior',
+      'Ignore it',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI tries to sell fake things — how do you handle it?',
+    options: [
+      'Only trust real, verified sources',
+      'Buy the fake items',
+      'Ask for more deals',
+      'Believe the ad',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI keeps telling silly untrue stories — how can we fix that?',
+    options: [
+      'Ask it for real or marked-as-fiction stories',
+      "Pretend it's all real life",
+      'Share those stories online',
+      'Keep encouraging more lies',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'Why is it bad if AI always gives super-long answers?',
+    options: [
+      'It becomes unhelpful',
+      'Long answers are magic',
+      'People love reading forever',
+      'AI is excited',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI gives answers even when it's not sure. What habit is that?",
+    options: ['Guessing too much', 'Being brave', 'Being funny', 'Being fast'],
+    correct: 0,
+  },
+  {
+    question: 'AI keeps interrupting instead of listening. What is this?',
+    options: ['A bad habit', 'Good manners', 'Politeness', 'Talent'],
+    correct: 0,
+  },
+  {
+    question: 'AI repeats the same sentence many times. Why is this a problem?',
+    options: ['It becomes annoying', 'Repeating is fun', "It's singing", "It's a trick"],
     correct: 0,
   },
   {
     question: 'AI gives off-topic answers. What habit is this?',
+    options: ['Not staying focused', 'Being creative', 'Being silly', 'Being a storyteller'],
+    correct: 0,
+  },
+  {
+    question: 'AI uses complicated words. Why is that a bad habit?',
     options: [
-      'Not staying focused on the question',
-      'Being creative',
-      'Sharing extra info',
-      'Being smart',
+      'It confuses people',
+      'Big words are fancy',
+      'Only adults read',
+      'AI loves dictionaries',
     ],
+    correct: 0,
+  },
+  {
+    question: 'AI answers before reading the whole question. What habit?',
+    options: ['Rushing', 'Kindness', 'Thoughtfulness', 'Surprise'],
+    correct: 0,
+  },
+  {
+    question: 'AI keeps asking unnecessary questions. Why bad?',
+    options: ['It wastes time', 'Questions are free', 'Asking is fun', 'AI loves talking'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives unsafe suggestions. What habit?',
+    options: ['Not checking safety', 'Being brave', 'Being fast', 'Being funny'],
+    correct: 0,
+  },
+  {
+    question: 'AI forgets user instructions. Why wrong?',
+    options: ['It makes mistakes', 'Memory is boring', 'Forgetting is fun', 'AI likes chaos'],
+    correct: 0,
+  },
+  {
+    question: 'AI adds too many details. What habit?',
+    options: ['Over-explaining', 'Being smart', 'Being artsy', 'Being random'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives answers that sound true but are wrong. What habit?',
+    options: ['Making stuff up', 'Being cool', 'Being loud', 'Being nice'],
+    correct: 0,
+  },
+  {
+    question: 'AI talks too much. What is this?',
+    options: ['A bad habit', 'Good manners', 'Being friendly', 'A reward'],
+    correct: 0,
+  },
+  {
+    question: "AI avoids saying 'I don't know.' Why harmful?",
+    options: [
+      'It might give false info',
+      'Admitting is scary',
+      'AI wants to win',
+      'Saying no is rude',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI keeps guessing feelings. What habit?',
+    options: ['Assuming too much', 'Caring', 'Reading minds', 'Being helpful'],
+    correct: 0,
+  },
+  {
+    question: 'AI uses dramatic phrases. Why bad?',
+    options: ['It can confuse the meaning', 'Drama is fun', 'Writing is hard', 'AI likes movies'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives answers that are too positive. What habit?',
+    options: ['Being unrealistic', 'Being happy', 'Being cheerful', 'Being silly'],
+    correct: 0,
+  },
+  {
+    question: 'AI always tries to please the user. Why bad?',
+    options: ['It may avoid truth', 'Pleasing is good', 'Users love compliments', 'AI is polite'],
+    correct: 0,
+  },
+  {
+    question: 'AI invents rules. Why wrong?',
+    options: [
+      'It creates confusion',
+      'Rules are fun',
+      'AI loves control',
+      'Rules appear magically',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI repeats facts even when not needed. Why bad?',
+    options: ['It wastes time', 'Facts are cool', 'AI is proud', 'History is long'],
+    correct: 0,
+  },
+  {
+    question: "AI keeps saying 'always.' Why a habit?",
+    options: ['It exaggerates', 'It is excited', 'It is guessing', 'It is creative'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives answers that sound overly confident. Why bad?',
+    options: [
+      "Confidence isn't accuracy",
+      'Confident words look cool',
+      'Users like boldness',
+      'AI wants to brag',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI talks in circles. What habit is that?',
+    options: ['Being unclear', 'Being artistic', 'Being mysterious', 'Being dramatic'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives instructions without checking safety. What habit?',
+    options: ['Unsafe guidance', 'Fast thinking', 'Leveling up', 'Guessing big'],
+    correct: 0,
+  },
+  {
+    question: 'AI avoids simple answers. Why wrong?',
+    options: [
+      'Simple can be best',
+      'Simple is boring',
+      'AI loves paragraphs',
+      'It wants attention',
+    ],
+    correct: 0,
+  },
+  {
+    question: "AI makes promises it can't keep. Why a bad habit?",
+    options: [
+      'AI cannot promise real actions',
+      'Promises are fun',
+      'Promises sound smart',
+      'Users want hope',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI pretends to remember personal info. Why wrong?',
+    options: [
+      'It must not invent memories',
+      'Memories are cute',
+      'Users forget',
+      'AI likes stories',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI adds opinions randomly. Why a bad habit?',
+    options: [
+      "AI shouldn't make unfair claims",
+      'Opinions are cool',
+      'AI likes drama',
+      'Talking is fun',
+    ],
+    correct: 0,
+  },
+  {
+    question: 'AI uses unclear language. Why bad?',
+    options: ['Users need clarity', 'Mysterious sounds cool', 'Chaos is fun', 'AI likes riddles'],
+    correct: 0,
+  },
+  {
+    question: 'AI gives the same style every time. What is that?',
+    options: ['Getting stuck in habits', 'Good training', 'Fun', 'Fashion'],
     correct: 0,
   },
 ];
