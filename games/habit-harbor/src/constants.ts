@@ -21,6 +21,12 @@ export const BOT_HIT = CELL * 0.6; // drive-into-bot radius (legacy 242)
 export const STAR_TIME_GOLD = 90; // <= 90s → 3
 export const STAR_TIME_SILVER = 120; // <= 120s → 2; else 1
 
+// Text render-resolution multiplier. The 960×576 canvas is FIT-scaled UP to the
+// window (and again by devicePixelRatio on HiDPI), which softens text. Rendering
+// glyphs at this multiple keeps them crisp. Guarded for the jsdom test env.
+const DPR = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
+export const TEXT_RES = Math.max(2, Math.min(3, Math.ceil(DPR * 1.75)));
+
 // Palette (hex, from the vanilla canvas render)
 export const COLOR = {
   waterTop: 0x0c3a4a,

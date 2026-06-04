@@ -3,6 +3,7 @@
 // opened ✓") and the all-clear prompt. Mirrors bias-breaker's Banner.
 
 import Phaser from 'phaser';
+import { TEXT_RES } from '../constants';
 
 export type BannerKind = 'question' | 'correct' | 'wrong' | 'info';
 
@@ -33,6 +34,7 @@ export class Banner extends Phaser.GameObjects.Container {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '15px',
         color: '#06202a',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
     this.text = scene.add
@@ -44,6 +46,7 @@ export class Banner extends Phaser.GameObjects.Container {
         wordWrap: { width: 760 },
         stroke: '#06122e',
         strokeThickness: 4,
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5, 0.5);
     this.add([this.gfx, this.tagBg, this.tag, this.text]);

@@ -14,6 +14,7 @@ import {
   BOT_HIT,
   RESCUE_TOTAL,
   COLOR,
+  TEXT_RES,
 } from '../constants';
 import { buildMaze, isWall, type MazeModel, type OpenGates } from '../maze';
 import { Boat, type Dir } from '../entities/Boat';
@@ -274,17 +275,28 @@ export class GameScene extends Phaser.Scene {
 
   private drawWater(): void {
     const g = this.add.graphics().setDepth(0);
-    g.fillGradientStyle(COLOR.waterTop, COLOR.waterTop, COLOR.waterBot, COLOR.waterBot, 1);
+    // Diagonal depth gradient — lighter teal top-left, deep navy bottom-right.
+    g.fillGradientStyle(0x13526e, 0x0f4760, 0x081f38, 0x06182c, 1);
     g.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    g.lineStyle(2, COLOR.ripple, 0.06);
-    for (let y = 14; y < CANVAS_H; y += 24) {
-      g.beginPath();
-      for (let x = 0; x <= CANVAS_W; x += 14) {
-        const yy = y + Math.sin(x * 0.045 + y * 0.12) * 3;
-        if (x === 0) g.moveTo(x, yy);
-        else g.lineTo(x, yy);
+    // Two offset ripple layers for a richer shimmer.
+    const ripple = (startY: number, stepY: number, color: number, alpha: number, ph: number, amp: number) => {
+      g.lineStyle(1.5, color, alpha);
+      for (let y = startY; y < CANVAS_H; y += stepY) {
+        g.beginPath();
+        for (let x = 0; x <= CANVAS_W; x += 14) {
+          const yy = y + Math.sin(x * 0.045 + y * 0.12 + ph) * amp;
+          if (x === 0) g.moveTo(x, yy);
+          else g.lineTo(x, yy);
+        }
+        g.strokePath();
       }
-      g.strokePath();
+    };
+    ripple(14, 24, 0x7fe7f0, 0.06, 0, 3);
+    ripple(28, 30, 0x9ff0ff, 0.04, 1.6, 2);
+    // Faint sun-glint specks (deterministic so HMR doesn't reshuffle them).
+    g.fillStyle(0xbfefff, 0.1);
+    for (let i = 0; i < 22; i++) {
+      g.fillCircle((i * 137 + 40) % CANVAS_W, (i * 89 + 30) % CANVAS_H, 1.4);
     }
   }
 
@@ -305,6 +317,18 @@ export class GameScene extends Phaser.Scene {
         g.moveTo(x, y + CELL / 2);
         g.lineTo(x + CELL, y + CELL / 2);
         g.strokePath();
+        // wood grain (two faint lengthwise lines) + the odd knot
+        g.lineStyle(1, 0x3a2613, 0.18);
+        for (const gy of [y + CELL * 0.27, y + CELL * 0.73]) {
+          g.beginPath();
+          g.moveTo(x + 3, gy);
+          g.lineTo(x + CELL - 3, gy);
+          g.strokePath();
+        }
+        if ((c * 7 + r * 5) % 4 === 0) {
+          g.fillStyle(0x2a1a0c, 0.4);
+          g.fillCircle(x + CELL * 0.5, y + CELL * 0.27, 1.7);
+        }
         // light rims where the dock meets water (top/left), dark rims (bottom/right)
         if (!isDock(c, r - 1)) this.rim(g, x, y + 1, x + CELL, y + 1, COLOR.dockRimLight, 0.45);
         if (!isDock(c - 1, r)) this.rim(g, x + 1, y, x + 1, y + CELL, COLOR.dockRimLight, 0.22);
@@ -368,18 +392,38 @@ export class GameScene extends Phaser.Scene {
   private drawExit(): void {
     const x = this.maze.exit.c * CELL;
     const y = this.maze.exit.r * CELL;
-    const g = this.add.graphics().setDepth(15);
-    for (let i = 3; i >= 1; i--) {
-      g.fillStyle(COLOR.exit, (0.12 * i) / 3);
-      g.fillRoundedRect(x + 6 - i * 3, y + 6 - i * 3, CELL - 12 + i * 6, CELL - 12 + i * 6, 10 + i * 2);
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+    // Pulsing radial glow — drawn local to its own position so it scales in place.
+    const glow = this.add.graphics({ x: cx, y: cy }).setDepth(14);
+    for (let i = 5; i >= 1; i--) {
+      glow.fillStyle(COLOR.exit, 0.06 * i);
+      glow.fillCircle(0, 0, 10 + i * 6);
     }
-    g.fillStyle(COLOR.exit, 0.85);
-    g.fillRoundedRect(x + 6, y + 6, CELL - 12, CELL - 12, 10);
+    this.tweens.add({
+      targets: glow,
+      scale: { from: 0.95, to: 1.08 },
+      alpha: { from: 0.7, to: 1 },
+      duration: 1100,
+      yoyo: true,
+      repeat: -1,
+    });
+    // Harbor-mouth pad: dark base + green inner wash + bright rim.
+    const pad = this.add.graphics().setDepth(15);
+    pad.fillStyle(0x0c3b2a, 0.92);
+    pad.fillRoundedRect(x + 5, y + 5, CELL - 10, CELL - 10, 12);
+    pad.fillStyle(COLOR.exit, 0.18);
+    pad.fillRoundedRect(x + 9, y + 9, CELL - 18, CELL - 18, 9);
+    pad.lineStyle(2.5, COLOR.exit, 0.95);
+    pad.strokeRoundedRect(x + 5, y + 5, CELL - 10, CELL - 10, 12);
     this.add
-      .text(x + CELL / 2, y + CELL / 2, '⛵', { fontFamily: 'sans-serif', fontSize: `${Math.round(CELL * 0.42)}px` })
+      .text(cx, cy, '⛵', {
+        fontFamily: 'sans-serif',
+        fontSize: `${Math.round(CELL * 0.44)}px`,
+        resolution: TEXT_RES,
+      })
       .setOrigin(0.5)
       .setDepth(16);
-    this.tweens.add({ targets: g, alpha: { from: 0.75, to: 1 }, duration: 900, yoyo: true, repeat: -1 });
   }
 
   // ---- touch D-pad (booth tablets) ----------------------------------------
@@ -395,7 +439,7 @@ export class GameScene extends Phaser.Scene {
         .setDepth(110)
         .setInteractive({ useHandCursor: true });
       this.add
-        .text(x, y, label, { fontFamily: 'Arial', fontSize: '22px', color: '#cfeefe' })
+        .text(x, y, label, { fontFamily: 'Arial', fontSize: '22px', color: '#cfeefe', resolution: TEXT_RES })
         .setOrigin(0.5)
         .setScrollFactor(0)
         .setDepth(111);
