@@ -15,7 +15,7 @@ const root = path.join(__dirname, '..');
 const out = path.join(root, 'dist');
 
 // Games to publish (each must already be built into games/<id>/dist).
-const GAMES = ['bias-breaker', 'habit-harbor'];
+const GAMES = ['bias-breaker', 'habit-harbor', 'privacy-vaults'];
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
