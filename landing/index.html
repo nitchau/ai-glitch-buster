@@ -7,12 +7,13 @@
     <style>
       :root {
         --bg: #0a0820;
-        --card: #14224a;
-        --card2: #0e1a3a;
+        --node: #14224a;
+        --node2: #0e1a3a;
         --green: #43e97b;
         --cyan: #38f9d7;
         --ink: #cfeefe;
         --muted: #7e8bb0;
+        --path: #2a3a66;
       }
       * {
         box-sizing: border-box;
@@ -20,137 +21,167 @@
       body {
         margin: 0;
         min-height: 100vh;
-        background: radial-gradient(1200px 600px at 50% -10%, #1a1247 0%, var(--bg) 60%);
+        background: radial-gradient(1100px 700px at 50% -5%, #1a1247 0%, var(--bg) 60%);
         color: var(--ink);
         font-family: 'Trebuchet MS', system-ui, sans-serif;
-        padding: 2rem 1rem 3rem;
-      }
-      .wrap {
-        max-width: 860px;
-        margin: 0 auto;
-      }
-      header {
+        padding: 1.5rem 1rem 2.5rem;
         text-align: center;
-        margin-bottom: 2rem;
       }
       h1 {
-        font-size: clamp(2rem, 6vw, 3.2rem);
+        font-size: clamp(1.8rem, 5.5vw, 3rem);
         margin: 0.2em 0 0;
         color: var(--green);
-        letter-spacing: 0.5px;
         text-shadow: 0 2px 0 #06351f, 0 0 24px rgba(67, 233, 123, 0.35);
       }
       .sub {
         opacity: 0.85;
-        font-size: clamp(1rem, 3vw, 1.25rem);
-        margin-top: 0.4em;
+        font-size: clamp(0.95rem, 3vw, 1.2rem);
+        margin-top: 0.35em;
       }
-      .grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      /* The island map: 4 corners + a centre Core, paths drawn behind the nodes. */
+      .map {
+        position: relative;
+        width: min(94vw, 760px);
+        aspect-ratio: 5 / 4;
+        margin: 1.4rem auto 0;
       }
-      .card {
+      .paths {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+      .seg {
+        stroke: var(--path);
+        stroke-width: 5;
+        fill: none;
+        stroke-linecap: round;
+        stroke-dasharray: 2 9;
+        vector-effect: non-scaling-stroke;
+        opacity: 0.7;
+      }
+      .seg.active {
+        stroke: var(--green);
+        stroke-width: 6;
+        stroke-dasharray: 10 8;
+        opacity: 1;
+        filter: drop-shadow(0 0 4px rgba(67, 233, 123, 0.7));
+        animation: flow 0.9s linear infinite;
+      }
+      @keyframes flow {
+        to {
+          stroke-dashoffset: -18;
+        }
+      }
+      .node {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        width: clamp(108px, 17vw, 150px);
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 1rem;
+        gap: 0.15rem;
         text-decoration: none;
         color: inherit;
-        background: linear-gradient(160deg, var(--card), var(--card2));
+        background: linear-gradient(160deg, var(--node), var(--node2));
         border: 2px solid #2a3a66;
-        border-radius: 18px;
-        padding: 1rem 1.1rem;
+        border-radius: 16px;
+        padding: 0.7rem 0.5rem 0.6rem;
         transition:
           transform 0.12s ease,
           border-color 0.12s ease,
           box-shadow 0.12s ease;
       }
-      .card.play {
-        border-color: var(--green);
-        box-shadow: 0 6px 24px rgba(67, 233, 123, 0.12);
-        cursor: pointer;
-      }
-      .card.play:hover {
-        transform: translateY(-3px);
-        border-color: var(--cyan);
-        box-shadow: 0 10px 30px rgba(56, 249, 215, 0.22);
-      }
-      .card.locked {
-        opacity: 0.6;
-        filter: grayscale(0.3);
-      }
-      .icon {
-        font-size: 2.4rem;
+      .node .icon {
+        font-size: clamp(1.7rem, 4.5vw, 2.4rem);
         line-height: 1;
-        width: 2.8rem;
-        text-align: center;
-        flex: 0 0 auto;
       }
-      .meta {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
-      .name {
+      .node .name {
         font-weight: 800;
-        font-size: 1.15rem;
+        font-size: clamp(0.78rem, 2vw, 0.98rem);
+        line-height: 1.1;
       }
-      .badge {
-        font-size: 0.92rem;
-        margin-top: 0.2em;
+      .node .badge {
+        font-size: clamp(0.68rem, 1.7vw, 0.82rem);
         color: var(--muted);
+        margin-top: 0.1em;
       }
-      .badge.go {
+      .node .badge.go {
         color: var(--green);
         font-weight: 700;
       }
-      .badge.done {
+      .node .badge.done {
         color: var(--cyan);
+        letter-spacing: 1px;
       }
-      .stars {
-        letter-spacing: 2px;
+      .node.play {
+        border-color: var(--green);
+        box-shadow: 0 6px 22px rgba(67, 233, 123, 0.18);
+        cursor: pointer;
+      }
+      .node.play:hover {
+        transform: translate(-50%, -50%) translateY(-4px);
+        border-color: var(--cyan);
+        box-shadow: 0 12px 30px rgba(56, 249, 215, 0.28);
+      }
+      .node.locked {
+        opacity: 0.55;
+        filter: grayscale(0.35);
+      }
+      /* The Core sits in the centre as the final goal. */
+      .node.core {
+        width: clamp(118px, 18vw, 158px);
+        aspect-ratio: 1;
+        border-radius: 50%;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 35%, #3a1f5e, var(--node2));
       }
       footer {
-        text-align: center;
-        margin-top: 2rem;
+        margin-top: 1.6rem;
         color: var(--muted);
-        font-size: 0.85rem;
+        font-size: 0.82rem;
       }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
-        <div style="font-size: 2.6rem">🛡️</div>
-        <h1>Glitch Guardians</h1>
-        <div class="sub">Pick an island and become an AI Safety hero!</div>
-      </header>
-      <div class="grid" id="islands"></div>
-      <footer>Your progress is saved on this device. ⭐ = stars earned.</footer>
+    <h1>Glitch Guardians</h1>
+    <div class="sub">Clear an island to light the path to the next!</div>
+    <div class="map" id="map">
+      <svg class="paths" viewBox="0 0 100 100" preserveAspectRatio="none" id="paths"></svg>
     </div>
+    <footer>Your progress is saved on this device. ⭐ = stars earned.</footer>
     <script>
-      // The five islands, in ISLANDS order. Only built games are playable; the rest
-      // show "coming soon". Unlock/clear/stars come from localStorage.gg.profile,
-      // which the games write on this same Vercel origin.
+      // 4 islands in the corners + The Core in the centre (x/y are % of the map).
       var ISLANDS = [
-        { id: 'bias-breaker', name: 'Bias Breaker', icon: '⚖️', built: true },
-        { id: 'habit-harbor', name: 'Bad-Habit Harbor', icon: '🌊', built: true },
-        { id: 'privacy-vaults', name: 'Privacy Vault', icon: '🔐', built: false },
-        { id: 'reality-tower', name: 'Hallucination Tower', icon: '🗼', built: false },
-        { id: 'the-core', name: 'The Core', icon: '💥', built: false },
+        { id: 'bias-breaker', name: 'Bias Breaker', icon: '⚖️', built: true, x: 15, y: 18 },
+        { id: 'habit-harbor', name: 'Bad-Habit Harbor', icon: '🌊', built: true, x: 85, y: 18 },
+        { id: 'privacy-vaults', name: 'Privacy Vault', icon: '🔐', built: false, x: 85, y: 82 },
+        { id: 'reality-tower', name: 'Hallucination Tower', icon: '🗼', built: false, x: 15, y: 82 },
+        { id: 'the-core', name: 'The Core', icon: '💥', built: false, x: 50, y: 50 },
+      ];
+      // The unlock chain: clearing one island lights the path to (and opens) the next.
+      var CHAIN = [
+        ['bias-breaker', 'habit-harbor'],
+        ['habit-harbor', 'privacy-vaults'],
+        ['privacy-vaults', 'reality-tower'],
+        ['reality-tower', 'the-core'],
       ];
 
+      function byId(id) {
+        for (var i = 0; i < ISLANDS.length; i++) if (ISLANDS[i].id === id) return ISLANDS[i];
+        return null;
+      }
       function loadProfile() {
         try {
-          var raw = localStorage.getItem('gg.profile');
-          if (raw) return JSON.parse(raw);
+          var r = localStorage.getItem('gg.profile');
+          if (r) return JSON.parse(r);
         } catch (e) {
-          /* storage blocked / corrupt → fall through to defaults */
+          /* blocked / corrupt → defaults */
         }
         return null;
       }
-
       var profile = loadProfile();
-
       // No profile → only the first island is open (mirrors @gg/shared blankProgress).
       function stateFor(island) {
         var p = profile && profile.progress ? profile.progress[island.id] : null;
@@ -160,18 +191,36 @@
           stars: p && p.stars ? p.stars : 0,
         };
       }
-
       function starStr(n) {
         n = Math.max(0, Math.min(3, n));
         return '⭐'.repeat(n) + '☆'.repeat(3 - n);
       }
 
-      var host = document.getElementById('islands');
+      // Paths first (behind the nodes): a segment glows + flows once its destination unlocks.
+      var svg = document.getElementById('paths');
+      var SVGNS = 'http://www.w3.org/2000/svg';
+      CHAIN.forEach(function (seg) {
+        var a = byId(seg[0]);
+        var b = byId(seg[1]);
+        var line = document.createElementNS(SVGNS, 'line');
+        line.setAttribute('x1', a.x);
+        line.setAttribute('y1', a.y);
+        line.setAttribute('x2', b.x);
+        line.setAttribute('y2', b.y);
+        line.setAttribute('class', 'seg' + (stateFor(b).unlocked ? ' active' : ''));
+        svg.appendChild(line);
+      });
+
+      // Island nodes on top.
+      var map = document.getElementById('map');
       ISLANDS.forEach(function (island) {
         var s = stateFor(island);
         var playable = island.built && s.unlocked;
         var el = document.createElement(playable ? 'a' : 'div');
-        el.className = 'card ' + (playable ? 'play' : 'locked');
+        el.className =
+          'node ' + (playable ? 'play' : 'locked') + (island.id === 'the-core' ? ' core' : '');
+        el.style.left = island.x + '%';
+        el.style.top = island.y + '%';
         if (playable) el.href = '/' + island.id + '/';
 
         var badge, cls;
@@ -182,7 +231,7 @@
           badge = '🔒 Locked';
           cls = '';
         } else if (s.cleared) {
-          badge = 'Cleared · <span class="stars">' + starStr(s.stars) + '</span> · Play again';
+          badge = starStr(s.stars);
           cls = 'done';
         } else {
           badge = '▶ Play';
@@ -192,14 +241,14 @@
         el.innerHTML =
           '<div class="icon">' +
           island.icon +
-          '</div><div class="meta"><div class="name">' +
+          '</div><div class="name">' +
           island.name +
           '</div><div class="badge ' +
           cls +
           '">' +
           badge +
-          '</div></div>';
-        host.appendChild(el);
+          '</div>';
+        map.appendChild(el);
       });
     </script>
   </body>
