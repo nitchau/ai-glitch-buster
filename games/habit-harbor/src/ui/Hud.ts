@@ -17,12 +17,12 @@ export class Hud {
   private readonly timer: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, total: number) {
-    const bg = scene.add.graphics().setScrollFactor(0).setDepth(209);
+    const bg = scene.add.graphics().setDepth(209);
     pill(bg, 14, 12, 176, 36);
     pill(bg, 200, 12, 96, 36);
 
-    this.rescued = scene.add.text(30, 30, '', STYLE).setOrigin(0, 0.5).setScrollFactor(0).setDepth(210);
-    this.timer = scene.add.text(214, 30, '', STYLE).setOrigin(0, 0.5).setScrollFactor(0).setDepth(210);
+    this.rescued = scene.add.text(30, 30, '', STYLE).setOrigin(0, 0.5).setDepth(210);
+    this.timer = scene.add.text(214, 30, '', STYLE).setOrigin(0, 0.5).setDepth(210);
     this.setRescued(0, total);
     this.setTimer(0);
   }

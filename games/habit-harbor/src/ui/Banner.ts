@@ -3,7 +3,7 @@
 // opened ✓") and the all-clear prompt. Mirrors bias-breaker's Banner.
 
 import Phaser from 'phaser';
-import { TEXT_RES } from '../constants';
+import { TEXT_RES, CANVAS_W } from '../constants';
 
 export type BannerKind = 'question' | 'correct' | 'wrong' | 'info';
 
@@ -26,7 +26,7 @@ export class Banner extends Phaser.GameObjects.Container {
   private text: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene) {
-    super(scene, scene.scale.width / 2, 74);
+    super(scene, CANVAS_W / 2, 74);
     this.gfx = scene.add.graphics();
     this.tagBg = scene.add.graphics();
     this.tag = scene.add
@@ -51,7 +51,7 @@ export class Banner extends Phaser.GameObjects.Container {
       .setOrigin(0.5, 0.5);
     this.add([this.gfx, this.tagBg, this.tag, this.text]);
     scene.add.existing(this);
-    this.setScrollFactor(0).setDepth(200);
+    this.setDepth(200);
     this.setVisible(false);
   }
 

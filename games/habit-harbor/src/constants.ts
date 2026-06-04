@@ -5,8 +5,13 @@
 export const COLS = 15;
 export const ROWS = 9;
 export const CELL = 64;
-export const CANVAS_W = COLS * CELL; // 960
-export const CANVAS_H = ROWS * CELL; // 576
+export const CANVAS_W = COLS * CELL; // 960 (logical world width)
+export const CANVAS_H = ROWS * CELL; // 576 (logical world height)
+
+// Supersample factor: the canvas backing store is RENDER_SCALE× the logical size
+// and the camera is zoomed to match, so vector graphics (not just text) rasterize
+// at higher resolution and stay crisp when FIT-scaled to the window.
+export const RENDER_SCALE = 2;
 
 // Boat
 export const BOAT_SPEED = 3; // px/frame at 60fps (legacy habit-harbor.js:111)

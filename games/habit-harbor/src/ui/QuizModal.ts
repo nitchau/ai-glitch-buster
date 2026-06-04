@@ -5,7 +5,7 @@
 // and click feedback. The scene owns the paused state; this renders + reports.
 
 import Phaser from 'phaser';
-import { TEXT_RES } from '../constants';
+import { TEXT_RES, CANVAS_W, CANVAS_H } from '../constants';
 import { toChoices, type Question } from '@gg/shared';
 
 export type Choice = { text: string; isCorrect: boolean };
@@ -27,8 +27,8 @@ export class QuizModal {
   open(q: Question, explain: string | null, onPick: (choice: Choice) => void): void {
     this.close();
     const s = this.scene;
-    const W = s.scale.width;
-    const H = s.scale.height;
+    const W = CANVAS_W;
+    const H = CANVAS_H;
     const cx = W / 2;
     const cy = H / 2;
     const pw = 724;
@@ -36,7 +36,7 @@ export class QuizModal {
     const px = cx - pw / 2;
     const py = cy - ph / 2;
 
-    const c = s.add.container(0, 0).setScrollFactor(0).setDepth(300);
+    const c = s.add.container(0, 0).setDepth(300);
 
     // Dimming scrim — swallows clicks/taps behind the modal.
     c.add(s.add.rectangle(cx, cy, W, H, 0x05101f, 0.8).setInteractive());

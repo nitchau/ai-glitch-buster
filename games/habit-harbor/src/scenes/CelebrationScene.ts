@@ -1,11 +1,13 @@
 // CelebrationScene — the Bad-Habit Harbor win screen (the win the vanilla game
 // never had). Stars by time + a rescue tally + confetti + Back-to-Map, wired to
 // the @gg/shared profile SDK so Privacy Vaults unlocks. Reached from
-// GameScene.enterExit(). Mirrors bias-breaker's CelebrationScene.
+// GameScene.enterExit(). Mirrors bias-breaker's CelebrationScene. Renders in the
+// logical CANVAS space with the camera zoomed by RENDER_SCALE (crisp shapes); text
+// uses TEXT_RES so it stays sharp under that zoom.
 
 import Phaser from 'phaser';
 import { markIslandCleared } from '@gg/shared';
-import { STAR_TIME_GOLD, STAR_TIME_SILVER } from '../constants';
+import { STAR_TIME_GOLD, STAR_TIME_SILVER, CANVAS_W, CANVAS_H, RENDER_SCALE, TEXT_RES } from '../constants';
 
 export type CelebrationData = {
   stars: number;
@@ -21,10 +23,13 @@ export class CelebrationScene extends Phaser.Scene {
   }
 
   create(data: CelebrationData): void {
-    const { width, height } = this.scale;
+    const width = CANVAS_W;
+    const height = CANVAS_H;
     const cx = width / 2;
 
     this.cameras.main.setBackgroundColor('#0a2738');
+    this.cameras.main.setZoom(RENDER_SCALE);
+    this.cameras.main.centerOn(width / 2, height / 2);
     this.spawnConfetti();
 
     // We are no longer "in" the game — drop the refresh-resume flag, then persist
@@ -42,6 +47,7 @@ export class CelebrationScene extends Phaser.Scene {
         fontFamily: 'Arial Black, sans-serif',
         fontSize: '50px',
         color: '#43e97b',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
     this.add
@@ -54,6 +60,7 @@ export class CelebrationScene extends Phaser.Scene {
           fontSize: '21px',
           color: '#cfeefe',
           align: 'center',
+          resolution: TEXT_RES,
         }
       )
       .setOrigin(0.5);
@@ -62,7 +69,11 @@ export class CelebrationScene extends Phaser.Scene {
     const filled = Math.max(1, Math.min(3, data.stars || 1));
     const stars = '⭐'.repeat(filled) + '☆'.repeat(3 - filled);
     this.add
-      .text(cx, height * 0.43, stars, { fontFamily: 'Arial, sans-serif', fontSize: '56px' })
+      .text(cx, height * 0.43, stars, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '56px',
+        resolution: TEXT_RES,
+      })
       .setOrigin(0.5);
 
     // ---- Time + tier badge, rescue tally ----
@@ -73,6 +84,7 @@ export class CelebrationScene extends Phaser.Scene {
         fontFamily: 'Arial, sans-serif',
         fontSize: '24px',
         color: '#ffd166',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
 
@@ -85,6 +97,7 @@ export class CelebrationScene extends Phaser.Scene {
         fontFamily: 'Arial, sans-serif',
         fontSize: '22px',
         color: saved.ok ? '#38f9d7' : '#f5576c',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
 
@@ -108,6 +121,7 @@ export class CelebrationScene extends Phaser.Scene {
         color: '#06202a',
         backgroundColor: '#43e97b',
         padding: { x: 24, y: 12 },
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5)
       .setDepth(10)
@@ -119,7 +133,8 @@ export class CelebrationScene extends Phaser.Scene {
 
   // Tweened falling squares — a dependency-free confetti (no particle texture).
   private spawnConfetti(): void {
-    const { width, height } = this.scale;
+    const width = CANVAS_W;
+    const height = CANVAS_H;
     for (let i = 0; i < 60; i++) {
       const size = 6 + Math.random() * 6;
       const color = CONFETTI_COLORS[(Math.random() * CONFETTI_COLORS.length) | 0]!;

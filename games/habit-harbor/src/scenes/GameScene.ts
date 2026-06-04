@@ -15,6 +15,7 @@ import {
   RESCUE_TOTAL,
   COLOR,
   TEXT_RES,
+  RENDER_SCALE,
 } from '../constants';
 import { buildMaze, isWall, type MazeModel, type OpenGates } from '../maze';
 import { Boat, type Dir } from '../entities/Boat';
@@ -81,8 +82,11 @@ export class GameScene extends Phaser.Scene {
     };
     this.bots = [];
 
-    this.cameras.main.setBounds(0, 0, CANVAS_W, CANVAS_H);
     this.cameras.main.setBackgroundColor('#0a2738');
+    // Supersample: zoom the static camera so the logical world fills the larger
+    // (RENDER_SCALE×) canvas. UI is pinned via the fixed camera (scrollFactor 1).
+    this.cameras.main.setZoom(RENDER_SCALE);
+    this.cameras.main.centerOn(CANVAS_W / 2, CANVAS_H / 2);
 
     this.drawWater();
     this.drawDocks();
@@ -435,13 +439,11 @@ export class GameScene extends Phaser.Scene {
       const btn = this.add
         .rectangle(x, y, 46, 46, 0x14224a, 0.82)
         .setStrokeStyle(2, 0x43e97b)
-        .setScrollFactor(0)
         .setDepth(110)
         .setInteractive({ useHandCursor: true });
       this.add
         .text(x, y, label, { fontFamily: 'Arial', fontSize: '22px', color: '#cfeefe', resolution: TEXT_RES })
         .setOrigin(0.5)
-        .setScrollFactor(0)
         .setDepth(111);
       const set = (v: boolean) => () => {
         this.dpad[key] = v;

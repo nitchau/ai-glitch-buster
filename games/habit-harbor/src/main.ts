@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { PreloadScene } from './scenes/PreloadScene';
 import { GameScene } from './scenes/GameScene';
 import { CelebrationScene } from './scenes/CelebrationScene';
-import { CANVAS_W, CANVAS_H } from './constants';
+import { CANVAS_W, CANVAS_H, RENDER_SCALE } from './constants';
 
 declare const __TEST_SEAM__: boolean;
 
@@ -16,8 +16,10 @@ const game = new Phaser.Game({
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: CANVAS_W,
-    height: CANVAS_H,
+    // Supersampled backing store; scenes zoom their camera by RENDER_SCALE so the
+    // logical CANVAS_W×CANVAS_H world fills it. Crisp shapes + text when FIT-scaled.
+    width: CANVAS_W * RENDER_SCALE,
+    height: CANVAS_H * RENDER_SCALE,
   },
   scene: [PreloadScene, GameScene, CelebrationScene],
 });
