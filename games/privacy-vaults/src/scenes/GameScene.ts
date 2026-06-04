@@ -72,7 +72,7 @@ type Keys = Record<KeyName, Phaser.Input.Keyboard.Key>;
 type Phase = 'quiz' | 'play' | 'autopilot' | 'won';
 
 const CXP = PANEL_X + PANEL_W / 2; // panel centre x
-const QUIZ_RECT = { x: PANEL_X + 18, y: 308, w: PANEL_W - 36, h: 410 };
+const QUIZ_RECT = { x: PANEL_X + 18, y: 332, w: PANEL_W - 36, h: 388 };
 
 export class GameScene extends Phaser.Scene {
   private grid: Grid = emptyGrid();
@@ -630,7 +630,7 @@ export class GameScene extends Phaser.Scene {
     this.gBar = this.add.graphics().setDepth(11);
 
     this.linesText = this.add
-      .text(CXP, 280, '✓ Answered: 0', { fontFamily: 'Arial', fontSize: '12px', color: '#8b96b4', resolution: TEXT_RES })
+      .text(CXP, 286, '✓ Answered: 0', { fontFamily: 'Arial', fontSize: '12px', color: '#8b96b4', resolution: TEXT_RES })
       .setOrigin(0.5)
       .setDepth(12);
 
