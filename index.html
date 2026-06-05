@@ -288,6 +288,14 @@
             box-shadow: 0 12px 30px rgba(102,126,234,0.4);
         }
 
+        .video-card iframe {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 15px;
+            border: none;
+            margin-bottom: 10px;
+        }
+
         .video-card h4 {
             font-size: 1.5em;
             margin-bottom: 10px;
@@ -3470,7 +3478,18 @@
             alert('🎮 Game coming soon! Stay tuned for fun interactive games about ' + topic + '!');
         }
 
+        function pauseAllVideos() {
+            document.querySelectorAll('iframe').forEach(function(iframe) {
+                iframe.contentWindow.postMessage(JSON.stringify({
+                    event: 'command',
+                    func: 'pauseVideo',
+                    args: ''
+                }), '*');
+            });
+        }
+
         function hideAllContent() {
+            pauseAllVideos();
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
             if (window.ytPlayers) {
                 ytPlayers.forEach(p => { if (typeof p.pauseVideo === 'function') p.pauseVideo(); });
@@ -3482,6 +3501,25 @@
             document.getElementById('home').classList.add('active');
             updateBadgeDisplay(null);
         }
+
+        // Pause other YouTube videos when one starts playing
+        window.addEventListener('message', function(event) {
+            if (event.origin !== 'https://www.youtube.com') return;
+            try {
+                const data = JSON.parse(event.data);
+                if (data.event === 'onStateChange' && data.info === 1) {
+                    document.querySelectorAll('iframe').forEach(function(iframe) {
+                        if (iframe.contentWindow !== event.source) {
+                            iframe.contentWindow.postMessage(JSON.stringify({
+                                event: 'command',
+                                func: 'pauseVideo',
+                                args: ''
+                            }), '*');
+                        }
+                    });
+                }
+            } catch (e) {}
+        });
     </script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
