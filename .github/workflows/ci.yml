@@ -1,0 +1,29 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint
+      - run: pnpm -r test
+      - run: pnpm -r --filter='!./games/_shared' build
+      - name: Install Playwright browsers
+        run: pnpm -F bias-breaker exec playwright install --with-deps chromium
+      - run: pnpm -F bias-breaker e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report-bias-breaker, path: games/bias-breaker/playwright-report/ }
+      # Chromium is already installed above (shared browser cache); just run.
+      - run: pnpm -F habit-harbor e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report-habit-harbor, path: games/habit-harbor/playwright-report/ }

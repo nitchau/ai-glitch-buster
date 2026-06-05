@@ -67,20 +67,41 @@
 
         .badge-icons {
             display: flex;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        .badge-group {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 4px 6px;
         }
 
         .badge {
-            font-size: 2em;
+            font-size: 1.4em;
             filter: grayscale(100%);
             opacity: 0.5;
             transition: all 0.3s;
+        }
+
+        .badge.master {
+            font-size: 1.8em;
         }
 
         .badge.earned {
             filter: grayscale(0%);
             opacity: 1;
             animation: bounce 0.5s;
+        }
+
+        .badge-group.hidden {
+            display: none;
+        }
+
+        .badge-group.master-only .badge:not(.master) {
+            display: none;
         }
 
         @keyframes bounce {
@@ -491,11 +512,31 @@
             <h1>🛡️ AI Glitch Buster</h1>
             <div class="badges-container">
                 <h3>🏆 Badges</h3>
-                <div class="badge-icons">
-                    <span class="badge" id="badge-hallucination">🎭</span>
-                    <span class="badge" id="badge-bias">⚖️</span>
-                    <span class="badge" id="badge-bad-habits">🔄</span>
-                    <span class="badge" id="badge-privacy">🔒</span>
+                <div class="badge-icons" id="badge-display">
+                    <div class="badge-group" data-topic="hallucination">
+                        <span class="badge" id="badge-hallucination-15">🥉</span>
+                        <span class="badge" id="badge-hallucination-30">🥈</span>
+                        <span class="badge" id="badge-hallucination-45">🥇</span>
+                        <span class="badge master" id="badge-hallucination-60">🎭</span>
+                    </div>
+                    <div class="badge-group" data-topic="bias">
+                        <span class="badge" id="badge-bias-15">🥉</span>
+                        <span class="badge" id="badge-bias-30">🥈</span>
+                        <span class="badge" id="badge-bias-45">🥇</span>
+                        <span class="badge master" id="badge-bias-60">⚖️</span>
+                    </div>
+                    <div class="badge-group" data-topic="bad-habits">
+                        <span class="badge" id="badge-bad-habits-15">🥉</span>
+                        <span class="badge" id="badge-bad-habits-30">🥈</span>
+                        <span class="badge" id="badge-bad-habits-45">🥇</span>
+                        <span class="badge master" id="badge-bad-habits-60">🔄</span>
+                    </div>
+                    <div class="badge-group" data-topic="privacy">
+                        <span class="badge" id="badge-privacy-15">🥉</span>
+                        <span class="badge" id="badge-privacy-30">🥈</span>
+                        <span class="badge" id="badge-privacy-45">🥇</span>
+                        <span class="badge master" id="badge-privacy-60">🔒</span>
+                    </div>
                 </div>
             </div>
             <button class="feedback-btn"
@@ -551,6 +592,8 @@
                     100% { background-position: 0% 50%; }
                 }
             </style>
+            <!-- Glitch Guardians ships on this same GitHub Pages site, under /glitch-guardians/ (relative to this app). -->
+            <a id="gg-launch-button" class="gg-launch" href="glitch-guardians/" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">🎮 Play Glitch Guardians</a>
         </div>
 
         <!-- Home Screen -->
@@ -571,7 +614,7 @@
                 
                         <div class="ai-video">
                             <iframe
-                                src="https://www.youtube.com/embed/19xCdZWXsR0?enablejsapi=1&si=FIWOKKfI6HeOWjBx"
+                                src="https://www.youtube.com/embed/19xCdZWXsR0?si=FIWOKKfI6HeOWjBx&enablejsapi=1"
                                 title="YouTube video player"
                                 frameborder="0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -3072,16 +3115,57 @@
         let currentQuestionIndex = 0;
         let score = 0;
         let selectedAnswer = null;
-        let shuffledCorrectIndex = null;
+        let questionQueue = [];
+        let incorrectQueue = [];
         let badges = JSON.parse(localStorage.getItem('badges') || '{}');
+        const badgeTiers = [15, 30, 45, 60];
+
+        function updateBadgeDisplay(topic) {
+            var groups = document.querySelectorAll('.badge-group');
+            groups.forEach(function(g) {
+                var groupTopic = g.getAttribute('data-topic');
+                if (topic) {
+                    // In a topic: show only that topic's full badges
+                    if (groupTopic === topic) {
+                        g.classList.remove('hidden', 'master-only');
+                    } else {
+                        g.classList.add('hidden');
+                        g.classList.remove('master-only');
+                    }
+                } else {
+                    // Home: show all groups but only master badges
+                    g.classList.remove('hidden');
+                    g.classList.add('master-only');
+                }
+            });
+        }
+
+        function awardBadgesForScore(topic, correctCount) {
+            if (!badges[topic]) badges[topic] = {};
+            badgeTiers.forEach(tier => {
+                if (correctCount >= tier && !badges[topic][tier]) {
+                    badges[topic][tier] = true;
+                    localStorage.setItem('badges', JSON.stringify(badges));
+                    const el = document.getElementById(`badge-${topic}-${tier}`);
+                    if (el) el.classList.add('earned');
+                }
+            });
+        }
 
         // Load badges on startup
         window.addEventListener('load', () => {
             Object.keys(badges).forEach(topic => {
-                if (badges[topic]) {
-                    document.getElementById(`badge-${topic}`).classList.add('earned');
+                const topicBadges = badges[topic];
+                if (typeof topicBadges === 'object') {
+                    Object.keys(topicBadges).forEach(tier => {
+                        if (topicBadges[tier]) {
+                            const el = document.getElementById(`badge-${topic}-${tier}`);
+                            if (el) el.classList.add('earned');
+                        }
+                    });
                 }
             });
+            updateBadgeDisplay(null);
         });
 
         function showWhatIsAI() {
@@ -3092,10 +3176,11 @@
         function showTopic(topic) {
             currentTopic = topic;
             hideAllContent();
-            
+            updateBadgeDisplay(topic);
+
             const topicDiv = document.getElementById(topic);
             topicDiv.classList.add('active');
-            
+
             const info = topicInfo[topic];
             
             let videoSection = '';
@@ -3104,17 +3189,17 @@
                     <div class="video-section">
                         <div class="video-card" id="hallucination-video-1">
                             <h4>▶️ Aanya's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/jkIIGw4w9iI?enablejsapi=1&si=nSRs4sXBhH85ecUA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/jkIIGw4w9iI?si=nSRs4sXBhH85ecUA&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>When AI Makes Stuff Up</p>
                         </div>
                         <div class="video-card" id="hallucination-video-2">
                             <h4>▶️ Rihal's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/ftIE__c0UK4?enablejsapi=1&si=Og9k8w_ykEWUhmgO" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/ftIE__c0UK4?si=Og9k8w_ykEWUhmgO&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Trust but Check: Fact-Checking AI</p>
                         </div>
                         <div class="video-card" id="hallucination-video-3">
                             <h4>▶️ Noah's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/0ugCxxNE_YM?enablejsapi=1&si=FRHDFkLb8WtOcSgb" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/0ugCxxNE_YM?si=FRHDFkLb8WtOcSgb&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Spotting AI’s Sneaky Mistakes</p>
                         </div>
                     </div>
@@ -3124,17 +3209,17 @@
                     <div class="video-section">
                         <div class="video-card" id="bias-video-1">
                             <h4>▶️ Aanya's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/wwtyovlygds?enablejsapi=1&si=6lTrxWdE2E8fy6Aw  " title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/wwtyovlygds?si=6lTrxWdE2E8fy6Aw&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Is your AI Being Fair?</p>
                         </div>
                         <div class="video-card" id="bias-video-2">
                             <h4>▶️ Rihal's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/tcFABun9BCE?enablejsapi=1&si=knx7UqZCmubJjatM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/tcFABun9BCE?si=knx7UqZCmubJjatM&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>AI, Kindness, and Fair Play</p>
                         </div>
                         <div class="video-card" id="bias-video-3">
                             <h4>▶️ Noah's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/K_8doRi2BMA?enablejsapi=1&si=GEhn4c-OCJQx6kyR" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/K_8doRi2BMA?si=GEhn4c-OCJQx6kyR&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Does This AI Answer Feel Biased?</p>
                         </div>
                     </div>
@@ -3144,17 +3229,17 @@
                     <div class="video-section">
                         <div class="video-card" id="bad-habits-video-1">
                             <h4>▶️ Aanya's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/IBIvXeD6dU0?enablejsapi=1&si=lOug2IL5FNeaKPL4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/IBIvXeD6dU0?si=lOug2IL5FNeaKPL4&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Can AI be Mean Sometimes?</p>
                         </div>
                         <div class="video-card" id="bad-habits-video-2">
                             <h4>▶️ Rihal's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/rDn-P5nSHY8?enablejsapi=1&si=iHqOYxgcuZRdSUuz" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/rDn-P5nSHY8?si=iHqOYxgcuZRdSUuz&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Become an AI Safety Hero</p>
                         </div>
                         <div class="video-card" id="bad-habits-video-3">
                             <h4>▶️ Noah's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/ioNFy16TQRM?enablejsapi=1&si=25uyFAcg6_FQlBiE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/ioNFy16TQRM?si=25uyFAcg6_FQlBiE&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Stop AI from Copying Bad Habits</p>
                         </div>
                     </div>
@@ -3164,17 +3249,17 @@
                     <div class="video-section">
                         <div class="video-card" id="privacy-video-1">
                             <h4>▶️ Aanya's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/2odREouFOqM?enablejsapi=1&si=skRvNzL6hzAd9PSh" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/2odREouFOqM?si=skRvNzL6hzAd9PSh&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Keeping Your Secrets Safe from AI</p>
                         </div>
                         <div class="video-card" id="privacy-video-2">
                             <h4>▶️ Rihal's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/1J5fnSbnEQo?enablejsapi=1&si=94bm8ayYo5qi9vWE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/1J5fnSbnEQo?si=94bm8ayYo5qi9vWE&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Don’t Overshare with Chatbots</p>
                         </div>
                         <div class="video-card" id="privacy-video-3">
                             <h4>▶️ Noah's Take</h4>
-                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/nT64Jl8fAFs?enablejsapi=1&si=rBp8FkuwETbREkCt" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            <iframe class="w-full aspect-video rounded-xl mb-4" src="https://www.youtube.com/embed/nT64Jl8fAFs?si=rBp8FkuwETbREkCt&enablejsapi=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                             <p>Privacy Rules Every AI Should Follow</p>
                         </div>
                     </div>
@@ -3205,64 +3290,68 @@
 
         function startQuiz(topic) {
             currentTopic = topic;
-            currentQuestionIndex = 0;
             score = 0;
             selectedAnswer = null;
+            questionQueue = quizData[topic].map((_, i) => i);
+            incorrectQueue = [];
+            updateBadgeDisplay(topic);
+            currentQuestionIndex = 0;
 
             hideAllContent();
             const quizScreen = document.getElementById('quiz-screen');
             quizScreen.classList.add('active');
-            
+
             const info = topicInfo[topic];
-            quizScreen.innerHTML = `
-                <button class="back-home-btn" onclick="showTopic('${topic}')">← Back</button>
-                <div class="topic-header">
-                    <h2>${info.title} Quiz</h2>
-                </div>
-                <div class="score-display">
-                    Score: <span id="score">0</span> / ${quizData[topic].length}
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div class="quiz-container" id="quiz-container">
-                    ${renderQuestion()}
-                </div>
-            `;
+            const total = quizData[topic].length;
+            // Note: innerHTML usage here is safe as topicInfo values are hardcoded constants
+            quizScreen.innerHTML =
+                '<button class="back-home-btn" onclick="showTopic(\'' + topic + '\')">← Back</button>' +
+                '<div class="topic-header"><h2>' + info.title + ' Quiz</h2></div>' +
+                '<div class="score-display">' +
+                    '✅ Correct: <span id="score">0</span> / ' + total +
+                    '<span id="remaining-info" style="margin-left: 15px;">📋 Remaining: <span id="remaining-count">' + total + '</span></span>' +
+                    '<div class="progress-bar"><div class="progress-fill" id="progress" style="width: 0%"></div></div>' +
+                    '<div id="badge-progress" style="margin-top: 8px; font-size: 0.9em;">Next badge: 🥉 at 15 correct</div>' +
+                '</div>' +
+                '<div class="quiz-container" id="quiz-container">' + renderQuestion() + '</div>';
+        }
+
+        function shuffleWithCorrect(options, correctIndex) {
+            const indexed = options.map((opt, i) => ({ text: opt, wasCorrect: i === correctIndex }));
+            for (let i = indexed.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [indexed[i], indexed[j]] = [indexed[j], indexed[i]];
+            }
+            return {
+                shuffled: indexed.map(item => item.text),
+                correctIndex: indexed.findIndex(item => item.wasCorrect)
+            };
         }
 
         function renderQuestion() {
             const questions = quizData[currentTopic];
-            const q = questions[currentQuestionIndex];
+            const qIdx = questionQueue[currentQuestionIndex];
+            const q = questions[qIdx];
 
-            // Shuffle option indices using Fisher-Yates
-            const indices = q.options.map((_, i) => i);
-            for (let i = indices.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [indices[i], indices[j]] = [indices[j], indices[i]];
-            }
-            shuffledCorrectIndex = indices.indexOf(q.correct);
+            const { shuffled, correctIndex } = shuffleWithCorrect(q.options, q.correct);
+            q._shuffledCorrect = correctIndex;
 
-            return `
-                <div class="question">
-                    Question ${currentQuestionIndex + 1} of ${questions.length}: ${q.question}
-                </div>
-                <div class="options" id="options">
-                    ${indices.map((origIdx, shuffIdx) => `
-                        <div class="option" onclick="selectAnswer(${shuffIdx})" data-index="${shuffIdx}">
-                            ${q.options[origIdx]}
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="feedback" id="feedback"></div>
-                <div class="quiz-controls">
-                    <button class="btn btn-primary" onclick="checkAnswer()">Check Answer</button>
-                    ${currentQuestionIndex < questions.length - 1 ? 
-                        '<button class="btn btn-secondary" onclick="nextQuestion()" style="display:none" id="next-btn">Next Question →</button>' :
-                        '<button class="btn btn-secondary" onclick="finishQuiz()" style="display:none" id="finish-btn">Finish Quiz 🎉</button>'
-                    }
-                </div>
-            `;
+            const remaining = questionQueue.length - currentQuestionIndex;
+            const isLast = currentQuestionIndex >= questionQueue.length - 1;
+
+            return '<div class="question">Question: ' + q.question + '</div>' +
+                '<div class="options" id="options">' +
+                    shuffled.map(function(opt, idx) {
+                        return '<div class="option" onclick="selectAnswer(' + idx + ')" data-index="' + idx + '">' + opt + '</div>';
+                    }).join('') +
+                '</div>' +
+                '<div class="feedback" id="feedback"></div>' +
+                '<div class="quiz-controls">' +
+                    '<button class="btn btn-primary" onclick="checkAnswer()">Check Answer</button>' +
+                    (isLast ?
+                        '<button class="btn btn-secondary" onclick="finishRound()" style="display:none" id="next-btn">Continue →</button>' :
+                        '<button class="btn btn-secondary" onclick="nextQuestion()" style="display:none" id="next-btn">Next Question →</button>') +
+                '</div>';
         }
 
         function selectAnswer(index) {
@@ -3272,6 +3361,18 @@
             options[index].classList.add('selected');
         }
 
+        function updateBadgeProgress() {
+            const el = document.getElementById('badge-progress');
+            if (!el) return;
+            const nextTier = badgeTiers.find(t => score < t);
+            if (nextTier) {
+                const tierEmoji = nextTier === 15 ? '🥉' : nextTier === 30 ? '🥈' : nextTier === 45 ? '🥇' : '🏆';
+                el.textContent = 'Next badge: ' + tierEmoji + ' at ' + nextTier + ' correct (' + (nextTier - score) + ' more to go!)';
+            } else {
+                el.textContent = '🏆 All badges earned! You are a true Glitch Buster!';
+            }
+        }
+
         function checkAnswer() {
             if (selectedAnswer === null) {
                 alert('Please select an answer first!');
@@ -3279,90 +3380,98 @@
             }
 
             const questions = quizData[currentTopic];
-            const q = questions[currentQuestionIndex];
+            const qIdx = questionQueue[currentQuestionIndex];
+            const q = questions[qIdx];
+            const correctIdx = q._shuffledCorrect;
             const options = document.querySelectorAll('.option');
             const feedback = document.getElementById('feedback');
-            
+
             options.forEach(opt => {
                 opt.style.pointerEvents = 'none';
                 const idx = parseInt(opt.dataset.index);
-                if (idx === shuffledCorrectIndex) {
+                if (idx === correctIdx) {
                     opt.classList.add('correct');
                 } else if (idx === selectedAnswer) {
                     opt.classList.add('incorrect');
                 }
             });
 
-            if (selectedAnswer === shuffledCorrectIndex) {
+            if (selectedAnswer === correctIdx) {
                 score++;
                 feedback.className = 'feedback show correct';
                 feedback.textContent = '✅ Awesome! That\'s correct! You\'re learning to be a great AI Glitch Buster!';
+                awardBadgesForScore(currentTopic, score);
             } else {
+                incorrectQueue.push(qIdx);
                 feedback.className = 'feedback show incorrect';
-                feedback.textContent = '❌ Not quite right. The correct answer helps you stay safe when using AI!';
+                feedback.textContent = '❌ Not quite right. Don\'t worry, you\'ll get to try again!';
             }
 
             document.getElementById('score').textContent = score;
+            const total = quizData[currentTopic].length;
+            var progress = (score / total) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+            var remainingCount = (questionQueue.length - currentQuestionIndex - 1) + incorrectQueue.length;
+            document.getElementById('remaining-count').textContent = remainingCount;
+            updateBadgeProgress();
+
             document.querySelector('.btn-primary').style.display = 'none';
-            
-            const nextBtn = document.getElementById('next-btn');
-            const finishBtn = document.getElementById('finish-btn');
+            var nextBtn = document.getElementById('next-btn');
             if (nextBtn) nextBtn.style.display = 'inline-block';
-            if (finishBtn) finishBtn.style.display = 'inline-block';
         }
 
         function nextQuestion() {
             currentQuestionIndex++;
             selectedAnswer = null;
             document.getElementById('quiz-container').innerHTML = renderQuestion();
-            
-            const progress = (currentQuestionIndex / quizData[currentTopic].length) * 100;
-            document.getElementById('progress').style.width = progress + '%';
+        }
+
+        function finishRound() {
+            if (incorrectQueue.length === 0) {
+                finishQuiz();
+                return;
+            }
+
+            var wrongCount = incorrectQueue.length;
+            questionQueue = incorrectQueue;
+            incorrectQueue = [];
+            currentQuestionIndex = 0;
+            selectedAnswer = null;
+
+            var total = quizData[currentTopic].length;
+            var container = document.getElementById('quiz-container');
+            container.innerHTML =
+                '<div style="text-align: center; padding: 30px;">' +
+                    '<div style="font-size: 3em; margin-bottom: 20px;">🔄</div>' +
+                    '<h3 style="color: #667eea; margin-bottom: 15px;">Round Complete!</h3>' +
+                    '<p style="font-size: 1.3em;">Score so far: <strong>' + score + ' / ' + total + '</strong></p>' +
+                    '<p style="font-size: 1.2em; margin: 15px 0;">' + wrongCount + ' question' + (wrongCount > 1 ? 's' : '') + ' to retry. You\'ve got this!</p>' +
+                    '<button class="btn btn-primary" onclick="startRetryRound()">Let\'s Go! →</button>' +
+                '</div>';
+        }
+
+        function startRetryRound() {
+            selectedAnswer = null;
+            document.getElementById('quiz-container').innerHTML = renderQuestion();
+            document.getElementById('remaining-count').textContent = questionQueue.length;
         }
 
         function finishQuiz() {
-            const questions = quizData[currentTopic];
-            const percentage = Math.round((score / questions.length) * 100);
-            
-            // Award badge if score is 80% or higher
-            if (percentage >= 80) {
-                badges[currentTopic] = true;
-                localStorage.setItem('badges', JSON.stringify(badges));
-                document.getElementById(`badge-${currentTopic}`).classList.add('earned');
-            }
-            
-            let message = '';
-            let emoji = '';
-            if (percentage >= 80) {
-                message = 'Outstanding! You earned a badge! 🏆';
-                emoji = '🏆';
-            } else if (percentage >= 60) {
-                message = 'Great job! Keep learning!';
-                emoji = '🌟';
-            } else {
-                message = 'Good start! Try again to improve!';
-                emoji = '💪';
-            }
-
-            const quizScreen = document.getElementById('quiz-screen');
-            quizScreen.innerHTML = `
-                <button class="back-home-btn" onclick="goHome()">🏠 Home</button>
-                <div class="topic-header">
-                    <h2>${emoji} Quiz Complete!</h2>
-                </div>
-                <div class="quiz-container" style="text-align: center;">
-                    <div style="font-size: 5em; margin: 30px 0;">${emoji}</div>
-                    <h3 style="font-size: 2.2em; color: #667eea; margin-bottom: 20px;">${message}</h3>
-                    <div style="font-size: 1.8em; margin: 20px 0;">
-                        Your Score: <strong>${score} / ${questions.length}</strong> (${percentage}%)
-                    </div>
-                    ${percentage >= 80 ? '<p style="font-size: 1.3em; color: #28a745; margin: 20px 0;">🎉 Check your badges at the top of the page!</p>' : ''}
-                    <div class="quiz-controls" style="margin-top: 40px;">
-                        <button class="btn btn-primary" onclick="startQuiz('${currentTopic}')">Try Again</button>
-                        <button class="btn btn-secondary" onclick="showTopic('${currentTopic}')">Back to Topic</button>
-                    </div>
-                </div>
-            `;
+            var total = quizData[currentTopic].length;
+            var quizScreen = document.getElementById('quiz-screen');
+            // Note: innerHTML is safe here — all values are from hardcoded app state, not user input
+            quizScreen.innerHTML =
+                '<button class="back-home-btn" onclick="goHome()">🏠 Home</button>' +
+                '<div class="topic-header"><h2>🏆 Quiz Complete!</h2></div>' +
+                '<div class="quiz-container" style="text-align: center;">' +
+                    '<div style="font-size: 5em; margin: 30px 0;">🏆</div>' +
+                    '<h3 style="font-size: 2.2em; color: #667eea; margin-bottom: 20px;">Amazing! You mastered all ' + total + ' questions!</h3>' +
+                    '<p style="font-size: 1.3em; color: #28a745; margin: 20px 0;">🎉 Check your badges at the top of the page!</p>' +
+                    '<div class="quiz-controls" style="margin-top: 40px;">' +
+                        '<button class="btn btn-primary" onclick="startQuiz(\'' + currentTopic + '\')">Play Again</button>' +
+                        '<button class="btn btn-secondary" onclick="showTopic(\'' + currentTopic + '\')">Back to Topic</button>' +
+                    '</div>' +
+                '</div>';
         }
 
         function startGame(topic) {
@@ -3382,11 +3491,15 @@
         function hideAllContent() {
             pauseAllVideos();
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            if (window.ytPlayers) {
+                ytPlayers.forEach(p => { if (typeof p.pauseVideo === 'function') p.pauseVideo(); });
+            }
         }
 
         function goHome() {
             hideAllContent();
             document.getElementById('home').classList.add('active');
+            updateBadgeDisplay(null);
         }
 
         // Pause other YouTube videos when one starts playing
@@ -3408,5 +3521,46 @@
             } catch (e) {}
         });
     </script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        var ytPlayers = [];
+
+        function onYouTubeIframeAPIReady() {
+            initYTPlayers();
+        }
+
+        function initYTPlayers() {
+            ytPlayers.forEach(p => p.destroy && p.destroy());
+            ytPlayers = [];
+            document.querySelectorAll('iframe[src*="youtube.com/embed"]').forEach(iframe => {
+                if (!iframe.id) iframe.id = 'yt-' + Math.random().toString(36).slice(2, 9);
+                var player = new YT.Player(iframe.id, {
+                    events: {
+                        onStateChange: function(event) {
+                            if (event.data === YT.PlayerState.PLAYING) {
+                                ytPlayers.forEach(function(p) {
+                                    if (p !== event.target && typeof p.pauseVideo === 'function') {
+                                        p.pauseVideo();
+                                    }
+                                });
+                            }
+                        }
+                    }
+                });
+                ytPlayers.push(player);
+            });
+        }
+
+        // Re-init players when topic pages load new videos
+        var _origShowTopic = showTopic;
+        showTopic = function(topic) {
+            _origShowTopic(topic);
+            setTimeout(initYTPlayers, 500);
+        };
+    </script>
+
+    <!-- Glitch Guardians is now the standalone Phaser games (the "Play Glitch Guardians"
+         link above opens the deployed Vercel app). The legacy in-page GAME/ scripts were
+         removed in the Phase 4 cutover — that code now lives under legacy/GAME/. -->
 </body>
 </html>
