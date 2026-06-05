@@ -12,7 +12,7 @@ import {
   WALK_SPEED_PER_S,
   FRICTION,
 } from '../constants';
-import { loadAvatarChoice, ensureAvatarTextures, avatarTextureKey } from '../avatar';
+import { loadPersona, ensurePersonaTextures, personaTextureKey } from '../avatar';
 
 const STEP_INTERVAL = 7; // frames between walk-cycle swaps
 
@@ -35,11 +35,11 @@ export class Player {
   private walkFrame = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    const choice = loadAvatarChoice();
-    ensureAvatarTextures(scene, choice.gender, choice.skin);
-    this.texIdle = avatarTextureKey(choice.gender, choice.skin, 'idle');
-    this.texWalk0 = avatarTextureKey(choice.gender, choice.skin, 'walk0');
-    this.texWalk1 = avatarTextureKey(choice.gender, choice.skin, 'walk1');
+    const persona = loadPersona();
+    ensurePersonaTextures(scene, persona);
+    this.texIdle = personaTextureKey(persona.id, 'idle');
+    this.texWalk0 = personaTextureKey(persona.id, 'walk0');
+    this.texWalk1 = personaTextureKey(persona.id, 'walk1');
 
     this.sprite = scene.physics.add.sprite(x, y, this.texIdle);
     this.sprite.setOrigin(0.5, 1); // anchor at feet so y = ground line

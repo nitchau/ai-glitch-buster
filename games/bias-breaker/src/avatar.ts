@@ -1,107 +1,90 @@
-// Shared kid-avatar drawing + choice persistence.
-// Used by the Player entity and the AvatarSelectScene so the preview and the
-// in-game sprite are identical. The head is a SINGLE skin circle with hair
-// stamped as a cluster of circles on top (never a centre-anchored pie slice —
-// that left the face split into two tones). Parametrized by skin + gender,
-// mirroring the legacy bias-breaker-avatar.js colour hooks.
+// Shared kid-avatar drawing + persona persistence for Bias Breaker.
+//
+// The three playable characters are the AI Glitch Busters from the app's video —
+// Rihal, Aanya, and Noah. Each is a procedural cartoon kid (no image assets),
+// told apart by gender (hairstyle / bow), skin tone, and shirt colour. The picker
+// preview and the in-game sprite share this drawer, so they always match.
 
 import Phaser from 'phaser';
 import { PLAYER_W, PLAYER_H } from './constants';
 
-export type AvatarSkin = 'light' | 'dark';
 export type AvatarGender = 'boy' | 'girl';
-export type AvatarChoice = { gender: AvatarGender; skin: AvatarSkin };
 export type AvatarFrame = 'idle' | 'walk0' | 'walk1';
 
-export const AVATAR_SKINS: readonly AvatarSkin[] = ['light', 'dark'];
-export const AVATAR_GENDERS: readonly AvatarGender[] = ['boy', 'girl'];
-
-export type AvatarPersona = { name: string; title: string };
-
-// Presentation only: each of the four Guardians gets a name + a Datapolis hero
-// title (shown on the picker instead of a bare gender/skin label). The saved
-// choice + the art are still keyed by gender/skin.
-const PERSONA: Record<AvatarGender, Record<AvatarSkin, AvatarPersona>> = {
-  boy: {
-    light: { name: 'Leo', title: 'Fairness Champion' },
-    dark: { name: 'Kai', title: 'Bias Buster' },
-  },
-  girl: {
-    light: { name: 'Mia', title: 'Truth Seeker' },
-    dark: { name: 'Zara', title: 'Data Detective' },
-  },
+export type Persona = {
+  id: string;
+  name: string;
+  title: string;
+  gender: AvatarGender;
+  skin: number; // hex skin colour
+  shirt: number; // hex shirt colour
 };
 
-export function personaFor(gender: AvatarGender, skin: AvatarSkin): AvatarPersona {
-  return PERSONA[gender][skin];
-}
+// The three video heroes. Looks are an easy starting point — tweak names/gender/
+// skin/shirt freely; nothing else is keyed off them but the `id`.
+export const PERSONAS: readonly Persona[] = [
+  { id: 'rihal', name: 'Rihal', title: 'Bias Buster', gender: 'boy', skin: 0x8d5524, shirt: 0x3b82f6 },
+  { id: 'aanya', name: 'Aanya', title: 'Truth Seeker', gender: 'girl', skin: 0xc68642, shirt: 0xec4899 },
+  { id: 'noah', name: 'Noah', title: 'Data Defender', gender: 'boy', skin: 0xf1c27d, shirt: 0xf59e0b },
+];
 
-const STORAGE_KEY = 'gg.bias.avatar';
-
-const SKIN_COLOR: Record<AvatarSkin, number> = {
-  light: 0xfcd9a8,
-  dark: 0x875432,
-};
+const DEFAULT_ID = 'rihal';
+const STORAGE_KEY = 'gg.bias.persona';
 const HAIR_COLOR = 0x2b1a0e;
-const SHIRT = 0x43e97b;
-const SHIRT_DK = 0x2bc063;
 const PANTS = 0x3a4d6a;
 const SHOE = 0x26334d;
 const BOW = 0xff7eb6;
 
-export function loadAvatarChoice(): AvatarChoice {
+export function personaById(id: string): Persona {
+  return PERSONAS.find((p) => p.id === id) ?? PERSONAS[0]!;
+}
+
+export function loadPersona(): Persona {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<AvatarChoice>;
-      if (
-        (p.gender === 'boy' || p.gender === 'girl') &&
-        (p.skin === 'light' || p.skin === 'dark')
-      ) {
-        return { gender: p.gender, skin: p.skin };
-      }
-    }
+    const id = localStorage.getItem(STORAGE_KEY);
+    if (id) return personaById(id);
   } catch {
     /* ignore */
   }
-  return { gender: 'boy', skin: 'light' };
+  return personaById(DEFAULT_ID);
 }
 
-export function saveAvatarChoice(choice: AvatarChoice): void {
+export function savePersona(id: string): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(choice));
+    localStorage.setItem(STORAGE_KEY, id);
   } catch {
     /* ignore */
   }
 }
 
-export function avatarTextureKey(gender: AvatarGender, skin: AvatarSkin, frame: AvatarFrame): string {
-  return `kid-${gender}-${skin}-${frame}`;
+export function personaTextureKey(id: string, frame: AvatarFrame): string {
+  return `kid-${id}-${frame}`;
 }
 
-// Generate the three frames (idle / two walk strides) for a gender+skin combo.
-export function ensureAvatarTextures(
-  scene: Phaser.Scene,
-  gender: AvatarGender,
-  skin: AvatarSkin
-): void {
-  if (scene.textures.exists(avatarTextureKey(gender, skin, 'idle'))) return;
-  drawKid(scene, avatarTextureKey(gender, skin, 'idle'), gender, skin, 0);
-  drawKid(scene, avatarTextureKey(gender, skin, 'walk0'), gender, skin, 1);
-  drawKid(scene, avatarTextureKey(gender, skin, 'walk1'), gender, skin, -1);
+// Generate the three frames (idle / two walk strides) for a persona.
+export function ensurePersonaTextures(scene: Phaser.Scene, persona: Persona): void {
+  if (scene.textures.exists(personaTextureKey(persona.id, 'idle'))) return;
+  drawKid(scene, personaTextureKey(persona.id, 'idle'), persona, 0);
+  drawKid(scene, personaTextureKey(persona.id, 'walk0'), persona, 1);
+  drawKid(scene, personaTextureKey(persona.id, 'walk1'), persona, -1);
 }
 
-function drawKid(
-  scene: Phaser.Scene,
-  key: string,
-  gender: AvatarGender,
-  skin: AvatarSkin,
-  strideDir: number
-): void {
+// Multiply each RGB channel by f (<1 darkens) — used for the shirt's sleeves/collar.
+function darken(hex: number, f: number): number {
+  const r = Math.floor(((hex >> 16) & 0xff) * f);
+  const g = Math.floor(((hex >> 8) & 0xff) * f);
+  const b = Math.floor((hex & 0xff) * f);
+  return (r << 16) | (g << 8) | b;
+}
+
+function drawKid(scene: Phaser.Scene, key: string, persona: Persona, strideDir: number): void {
   const w = PLAYER_W;
   const h = PLAYER_H;
   const g = scene.add.graphics({ x: 0, y: 0 });
-  const SKIN = SKIN_COLOR[skin];
+  const SKIN = persona.skin;
+  const SHIRT = persona.shirt;
+  const SHIRT_DK = darken(persona.shirt, 0.78);
+  const gender = persona.gender;
 
   const cx = w / 2;
   const hipY = h * 0.6;
@@ -143,11 +126,10 @@ function drawKid(
   // Single skin head — the ONLY skin region on the face.
   g.fillStyle(SKIN);
   g.fillCircle(cx, headY, headR);
-  // Ears
   g.fillCircle(cx - headR + 1, headY + 1, 3);
   g.fillCircle(cx + headR - 1, headY + 1, 3);
 
-  // Hair cluster on top (legacy-style: circles along the top arc, not a wedge).
+  // Hair cluster on top.
   g.fillStyle(HAIR_COLOR);
   g.fillCircle(cx - 10, headY - 7, 5);
   g.fillCircle(cx - 3, headY - 11, 6);
