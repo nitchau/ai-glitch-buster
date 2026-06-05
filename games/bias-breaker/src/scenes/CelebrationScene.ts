@@ -99,8 +99,9 @@ export class CelebrationScene extends Phaser.Scene {
       } catch {
         /* ignore */
       }
-      // Phase 2 has no landing page yet; '/' 404s on Vercel until Phase 4.
-      window.location.href = '/';
+      // Go up one level (…/glitch-guardians/<game>/ -> …/glitch-guardians/) to the
+      // island map. Relative, so it works under any deploy sub-path.
+      window.location.href = '../';
     });
   }
 
