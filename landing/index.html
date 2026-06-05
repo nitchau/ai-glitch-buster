@@ -304,10 +304,14 @@
         return null;
       }
       var profile = loadProfile();
+      // PRESENTATION MODE (AI Presidential Challenge): keep every BUILT game unlocked
+      // so judges can jump straight into any island. Unbuilt islands stay "Soon".
+      // Set this to false to restore the normal clear-to-unlock progression.
+      var PRESENTATION_UNLOCK_ALL = true;
       function stateFor(o) {
         var p = profile && profile.progress ? profile.progress[o.id] : null;
         return {
-          unlocked: p ? !!p.unlocked : o.id === 'bias-breaker',
+          unlocked: (PRESENTATION_UNLOCK_ALL && o.built) || (p ? !!p.unlocked : o.id === 'bias-breaker'),
           cleared: p ? !!p.cleared : false,
           stars: p && p.stars ? p.stars : 0,
         };
