@@ -1,6 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm -F bias-breaker build && pnpm -F habit-harbor build && pnpm -F privacy-vaults build && node scripts/assemble-dist.cjs",
-  "outputDirectory": "dist"
-}

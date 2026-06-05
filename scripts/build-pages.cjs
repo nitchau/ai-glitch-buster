@@ -31,7 +31,7 @@ fs.mkdirSync(out, { recursive: true });
 for (const id of GAMES) {
   fs.cpSync(path.join(root, 'games', id, 'dist'), path.join(out, id), { recursive: true });
 }
-fs.copyFileSync(path.join(root, 'landing', 'index.html'), path.join(out, 'index.html'));
+fs.copyFileSync(path.join(root, 'games', 'landing', 'index.html'), path.join(out, 'index.html'));
 
 // 3. Drop sourcemaps — they're multi-MB and not needed to serve.
 let stripped = 0;

@@ -3,8 +3,8 @@
 Educational AI-safety games for kids, in two tiers:
 
 - `index.html` — main **AI Glitch Buster** quiz app (vanilla; frozen)
-- `games/` — Phaser 3 + TS + Vite monorepo (Vercel-deployed)
-- `legacy/GAME/` — original vanilla canvas games (reference for the rebuild)
+- `games/` — Phaser 3 + TS + Vite monorepo: the games (`bias-breaker`, `habit-harbor`, `privacy-vaults`), shared code (`_shared`), and the island-map (`landing/`)
+- `glitch-guardians/` — the built, committed bundle served by GitHub Pages (rebuild with `node scripts/build-pages.cjs`)
 
 ## Quick start
 
