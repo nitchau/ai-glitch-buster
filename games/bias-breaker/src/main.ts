@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PreloadScene } from './scenes/PreloadScene';
 import { AvatarSelectScene } from './scenes/AvatarSelectScene';
+import { HowToScene } from './scenes/HowToScene';
 import { GameScene } from './scenes/GameScene';
 import { CelebrationScene } from './scenes/CelebrationScene';
 import { CANVAS_W, CANVAS_H } from './constants';
@@ -24,7 +25,7 @@ const game = new Phaser.Game({
       debug: false,
     },
   },
-  scene: [PreloadScene, AvatarSelectScene, GameScene, CelebrationScene],
+  scene: [PreloadScene, AvatarSelectScene, HowToScene, GameScene, CelebrationScene],
 });
 
 // Test seam: expose the game instance in dev/preview only.

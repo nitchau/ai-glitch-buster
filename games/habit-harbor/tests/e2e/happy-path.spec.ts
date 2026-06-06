@@ -18,7 +18,12 @@ type HHScene = {
   answer(choice: { text: string; isCorrect: boolean }, bot: Bot | null): void;
 };
 type GameWin = {
-  __GAME__: { scene: { getScenes(active: boolean): HHScene[] } };
+  __GAME__: {
+    scene: {
+      getScenes(active: boolean): HHScene[];
+      getScene(key: string): { scene: { start(key: string): void } };
+    };
+  };
   __GAME_STATE__: () => { rescued: number; quizOpen: boolean; won: boolean; atExit: boolean };
 };
 
@@ -32,7 +37,20 @@ test('happy path: rescue 5 bots → win → Privacy Vaults unlocked', async ({ p
 
   await page.goto('/habit-harbor/');
 
-  // __GAME__ is set a few ticks before the SceneManager registers scenes.
+  // Boot now lands on the HowToScene briefing; wait for it, then skip straight to
+  // the maze (the briefing UI is verified separately). __GAME__ is set a few ticks
+  // before the SceneManager registers scenes.
+  await page.waitForFunction(
+    () => {
+      const g = (window as unknown as Partial<GameWin>).__GAME__;
+      return g != null && g.scene.getScenes(true).some((s) => s.sys.settings.key === 'HowToScene');
+    },
+    null,
+    { timeout: 15_000 }
+  );
+  await page.evaluate(() => {
+    (window as unknown as GameWin).__GAME__.scene.getScene('HowToScene').scene.start('GameScene');
+  });
   await page.waitForFunction(
     () => {
       const g = (window as unknown as Partial<GameWin>).__GAME__;

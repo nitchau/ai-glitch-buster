@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PreloadScene } from './scenes/PreloadScene';
+import { HowToScene } from './scenes/HowToScene';
 import { GameScene } from './scenes/GameScene';
 import { CANVAS_W, CANVAS_H, RENDER_SCALE } from './constants';
 
@@ -18,7 +19,7 @@ const game = new Phaser.Game({
     width: CANVAS_W * RENDER_SCALE,
     height: CANVAS_H * RENDER_SCALE,
   },
-  scene: [PreloadScene, GameScene],
+  scene: [PreloadScene, HowToScene, GameScene],
 });
 
 if (__TEST_SEAM__) {

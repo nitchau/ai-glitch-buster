@@ -89,7 +89,7 @@ export class AvatarSelectScene extends Phaser.Scene {
     btn.on('pointerout', () => btn.setBackgroundColor('#43e97b'));
     btn.on('pointerdown', () => {
       savePersona(this.selected.id);
-      this.scene.start('GameScene');
+      this.scene.start('HowToScene');
     });
 
     this.select(this.selected);
