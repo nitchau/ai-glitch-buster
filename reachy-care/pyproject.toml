@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reachy_care"
+version = "0.1.0"
+description = "ReachyCare - a voice-first Reachy Mini companion app for seniors (AIXelerate Hackathon)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "AIXelerate Hackathon Team" }]
+dependencies = [
+    "numpy",
+    "requests",
+    "python-dotenv",
+    "PyYAML",
+    "fastapi",
+    "uvicorn",
+    "reachy-mini>=1.9.0",
+]
+
+[project.optional-dependencies]
+# Cloud voice stack (recommended): STT/LLM/TTS via APIs, keys in .env
+cloud = ["openai>=1.40", "anthropic>=0.40"]
+# Wake word detection on-device
+wake = ["openwakeword>=0.6"]
+# Local/offline voice fallbacks (heavier installs, optional)
+local = ["faster-whisper", "pyttsx3", "sounddevice"]
+# Caregiver SMS / phone-call alerts
+sms = ["twilio"]
+dev = ["pytest", "ruff"]
+
+[project.entry-points."reachy_mini_apps"]
+reachy_care = "reachy_care.main:ReachyCareApp"
+
+[project.scripts]
+reachy-care = "reachy_care.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+reachy_care = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"

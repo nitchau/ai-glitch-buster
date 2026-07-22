@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReachyCare — Caregiver Settings</title>
+<style>
+  :root { --ink:#26323f; --soft:#5b6b7c; --card:#ffffff; --bg:#f2f5f8; --accent:#2f7d6d; --danger:#c0392b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Georgia, 'Times New Roman', serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:18px 24px; }
+  header h1 { margin:0; font-size:1.5rem; font-weight:600; }
+  header p { margin:4px 0 0; opacity:.9; font-size:.95rem; }
+  main { max-width:880px; margin:0 auto; padding:18px; display:grid; gap:16px; }
+  .card { background:var(--card); border-radius:12px; padding:18px 20px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .card h2 { margin:0 0 12px; font-size:1.1rem; color:var(--accent); }
+  label { display:block; font-size:.85rem; color:var(--soft); margin:10px 0 3px; }
+  input, select { width:100%; padding:9px 10px; font-size:1rem; border:1px solid #cfd8e0; border-radius:8px; font-family:inherit; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+  button { margin-top:12px; padding:10px 18px; font-size:1rem; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; font-family:inherit; }
+  button.small { padding:5px 10px; font-size:.85rem; margin:0; }
+  button.danger { background:var(--danger); }
+  button.ghost { background:#e8edf1; color:var(--ink); }
+  table { width:100%; border-collapse:collapse; font-size:.95rem; }
+  th, td { text-align:left; padding:7px 6px; border-bottom:1px solid #edf1f4; }
+  #banner { display:none; background:var(--danger); color:#fff; padding:14px 24px; font-size:1.05rem; }
+  #banner.on { display:block; }
+  .pill { display:inline-block; background:#e8f2ef; color:var(--accent); border-radius:999px; padding:2px 10px; font-size:.8rem; margin-left:8px; }
+  .stat { display:inline-block; margin-right:22px; }
+  .stat b { font-size:1.5rem; display:block; }
+  .muted { color:var(--soft); font-size:.85rem; }
+  ul.alerts { list-style:none; padding:0; margin:0; }
+  ul.alerts li { padding:7px 0; border-bottom:1px solid #edf1f4; font-size:.9rem; }
+  #saved { color:var(--accent); font-size:.9rem; margin-left:10px; visibility:hidden; }
+</style>
+</head>
+<body>
+<div id="banner"></div>
+<header>
+  <h1>ReachyCare <span id="demo" class="pill" style="display:none">DEMO MODE — alerts simulated</span></h1>
+  <p>Caregiver settings &amp; daily dashboard. Everything stays on the robot.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Today at a glance</h2>
+    <span class="stat"><b id="stat-adherence">–</b>meds taken (7 days)</span>
+    <span class="stat"><b id="stat-missed">–</b>missed (7 days)</span>
+    <span class="stat"><b id="stat-cal">–</b>calories today</span>
+    <span class="stat"><b id="stat-protein">–</b>protein today (g)</span>
+    <p class="muted">Reachy is a companion, not a medical device. The emergency feature alerts the
+    caregiver below — it is not a replacement for a phone or a medical alert device.</p>
+    <button class="danger" onclick="post('/api/emergency/test')">Test emergency alert (simulated)</button>
+    <button class="ghost" onclick="post('/api/emergency/cancel')">Cancel / false alarm</button>
+  </section>
+
+  <section class="card">
+    <h2>Care settings</h2>
+    <div class="row">
+      <div><label>Senior's name</label><input id="s-senior_name"></div>
+      <div><label>Personality</label><select id="s-personality"></select></div>
+      <div><label>Caregiver name</label><input id="s-caregiver_name"></div>
+      <div><label>Caregiver phone (for alerts)</label><input id="s-caregiver_phone" placeholder="+15551234567"></div>
+      <div><label>Volume (0–1)</label><input id="s-volume" type="number" min="0" max="1" step="0.1"></div>
+      <div><label>Speech rate (0.5–1.3)</label><input id="s-speech_rate" type="number" min="0.5" max="1.3" step="0.05"></div>
+      <div><label>Daily check-in time</label><input id="s-checkin_time" type="time"></div>
+      <div><label>Re-remind after (minutes)</label><input id="s-remind_again_minutes" type="number" min="1"></div>
+    </div>
+    <button onclick="saveSettings()">Save settings</button><span id="saved">Saved ✓</span>
+  </section>
+
+  <section class="card">
+    <h2>Medication schedule</h2>
+    <table id="meds"><thead><tr><th>Name</th><th>Dose</th><th>Times</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row">
+      <div><label>Name</label><input id="m-name" placeholder="Blood-pressure pill"></div>
+      <div><label>Dose</label><input id="m-dose" placeholder="1 tablet"></div>
+    </div>
+    <label>Times (comma separated, 24h)</label><input id="m-times" placeholder="09:00, 18:30">
+    <button onclick="addMed()">Add medication</button>
+  </section>
+
+  <section class="card">
+    <h2>Alerts &amp; activity</h2>
+    <ul id="alerts" class="alerts"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Reachy's memories</h2>
+    <p class="muted">Stored only on this robot. Remove anything the senior would rather forget.</p>
+    <ul id="memories" class="alerts"></ul>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = ["senior_name","personality","caregiver_name","caregiver_phone",
+                "volume","speech_rate","checkin_time","remind_again_minutes"];
+let editing = false;
+
+async function post(url, body) {
+  await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"},
+                    body: body ? JSON.stringify(body) : "{}"});
+  refresh();
+}
+async function del(url) { await fetch(url, {method:"DELETE"}); refresh(); }
+
+async function saveSettings() {
+  const payload = {};
+  for (const f of FIELDS) payload[f] = $("s-"+f).value;
+  payload.volume = parseFloat(payload.volume); payload.speech_rate = parseFloat(payload.speech_rate);
+  payload.remind_again_minutes = parseInt(payload.remind_again_minutes || "10");
+  await post("/api/settings", payload);
+  $("saved").style.visibility = "visible"; setTimeout(()=>$("saved").style.visibility="hidden", 1500);
+}
+
+async function addMed() {
+  const times = $("m-times").value.split(",").map(t=>t.trim()).filter(Boolean);
+  await post("/api/medications", {name:$("m-name").value, dose:$("m-dose").value, times});
+  $("m-name").value = $("m-dose").value = $("m-times").value = "";
+}
+
+async function refresh() {
+  let s;
+  try { s = await (await fetch("/api/state")).json(); } catch { return; }
+  $("demo").style.display = s.demo_mode ? "inline-block" : "none";
+
+  const unresolved = s.alerts.filter(a => a.kind === "emergency" && !a.resolved);
+  $("banner").className = unresolved.length ? "on" : "";
+  $("banner").textContent = unresolved.length ? "🚨 " + unresolved[0].message : "";
+
+  $("stat-adherence").textContent = s.adherence.confirmed;
+  $("stat-missed").textContent = s.adherence.missed;
+  $("stat-cal").textContent = s.today_nutrition.calories;
+  $("stat-protein").textContent = s.today_nutrition.protein_g;
+
+  if (!editing) {
+    const sel = $("s-personality");
+    sel.innerHTML = Object.entries(s.personalities)
+      .map(([k,v]) => `<option value="${k}">${v}</option>`).join("");
+    for (const f of FIELDS) $("s-"+f).value = s.settings[f];
+  }
+
+  $("meds").querySelector("tbody").innerHTML = s.medications.map(m =>
+    `<tr><td>${m.name}</td><td>${m.dose}</td><td>${m.times.join(", ")}</td>
+     <td><button class="small danger" onclick="del('/api/medications/${m.id}')">remove</button></td></tr>`
+  ).join("") || "<tr><td colspan=4 class=muted>No medications yet — add one below.</td></tr>";
+
+  $("alerts").innerHTML = s.alerts.map(a =>
+    `<li>${a.resolved ? "✅" : (a.kind === "emergency" ? "🚨" : "ℹ️")} <b>${a.at}</b> — ${a.message}
+     ${a.resolved ? "" : ` <button class="small ghost" onclick="post('/api/alerts/${a.id}/resolve')">resolve</button>`}</li>`
+  ).join("") || "<li class=muted>No alerts. All calm.</li>";
+
+  $("memories").innerHTML = s.memories.map(m =>
+    `<li>${m.text} <span class=muted>(${m.category}, ${m.created_at.slice(0,10)})</span>
+     <button class="small ghost" onclick="del('/api/memories/${m.id}')">forget</button></li>`
+  ).join("") || "<li class=muted>Nothing remembered yet.</li>";
+}
+
+document.addEventListener("focusin",  e => { if (e.target.id?.startsWith("s-")) editing = true; });
+document.addEventListener("focusout", e => { if (e.target.id?.startsWith("s-")) setTimeout(()=>editing=false, 200); });
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
